@@ -75,8 +75,9 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 - [x] Google OAuth (Google Cloud client + Supabase provider), email sign-in, email confirmation off for demo
 - [x] `.env.local` with public Supabase URL + key; secrets git-ignored
 - [x] GitHub Actions workflow → GitHub Pages deploy
-- [ ] Public GitHub repo created, repo variables set, Pages enabled
-- [ ] Add production URL to Supabase **Auth → URL Configuration → Redirect URLs**
+- [x] Public GitHub repo created, repo variables set, Pages enabled → https://dhannussh1.github.io/smartpack/
+- [x] Add production URL to Supabase **Auth → URL Configuration → Redirect URLs**
+- [ ] Verify Google sign-in end to end on the live site
 - [ ] Gemini API key → `npx supabase secrets set GEMINI_API_KEY=…`
 - [ ] PWA manifest + icons (installable on phone home screen) **(S)**
 
@@ -238,7 +239,7 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 
 ## 8. Build order (priority)
 1. ~~Setup, auth, onboarding~~ ✅
-2. Deploy to GitHub Pages and verify Google login in production
+2. ~~Deploy to GitHub Pages~~ ✅ (verify Google login in production)
 3. Ingredient alias seed + deterministic engine (works with no AI at all)
 4. `claude-dev` bridge for extraction while building the UI
 5. Result screen
