@@ -98,7 +98,8 @@ export function AppShell({
                       active ? "bg-white font-semibold text-ink shadow-[0_1px_2px_rgb(0_0_0/0.06)] ring-1 ring-line" : "text-ink-soft hover:bg-white/60 hover:text-ink",
                     )}
                   >
-                    {active && <motion.span layoutId="nav-dot" className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-brand" />}
+                    {/* plain marker: a shared layoutId here (rendered in both sidebar and drawer) kept the closing drawer alive */}
+                    {active && <span className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-brand" />}
                     <l.icon className={cn("h-[18px] w-[18px]", active ? "text-brand" : "text-ink-faint group-hover:text-ink-soft")} strokeWidth={1.8} />
                     {l.label}
                   </Link>
@@ -160,17 +161,20 @@ export function AppShell({
       </header>
 
       {/* mobile drawer */}
+      {/* Scrim and drawer are separate direct children: AnimatePresence cannot track exits through a
+          Fragment, which left an invisible drawer on screen that swallowed taps after closing. */}
       <AnimatePresence>
         {open && (
-          <>
-            <motion.div
-              key="scrim"
-              className="fixed inset-0 z-40 bg-ink/30 lg:hidden"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-            />
+          <motion.div
+            key="scrim"
+            className="fixed inset-0 z-40 bg-ink/30 lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+          />
+        )}
+        {open && (
             <motion.div
               key="drawer"
               className="fixed inset-y-0 right-0 z-50 flex w-[84%] max-w-xs flex-col bg-page px-4 py-5 shadow-2xl lg:hidden"
@@ -188,7 +192,6 @@ export function AppShell({
               <div className="mt-8 flex-1 overflow-y-auto">{nav(() => setOpen(false))}</div>
               {userCard}
             </motion.div>
-          </>
         )}
       </AnimatePresence>
 

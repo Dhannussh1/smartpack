@@ -116,8 +116,9 @@ function Overview({ p }: { p: Profile }) {
         </div>
       </Section>
 
-      <div className="mt-12 grid gap-8 lg:grid-cols-5">
-        <div className="lg:col-span-3">
+      {/* grid-cols-1 + min-w-0: long product names must truncate instead of widening the page on phones */}
+      <div className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-5">
+        <div className="min-w-0 lg:col-span-3">
           <h2 className="mb-4 flex items-end justify-between text-[15px] font-semibold text-ink">
             Recent scans
             <Link href="/history" className="text-sm font-medium text-brand hover:underline">
@@ -126,7 +127,7 @@ function Overview({ p }: { p: Profile }) {
           </h2>
           <RecentScans userId={p.user_id} />
         </div>
-        <div className="lg:col-span-2">
+        <div className="min-w-0 lg:col-span-2">
           <h2 className="mb-4 text-[15px] font-semibold text-ink">Health snapshot</h2>
           <Snapshot userId={p.user_id} />
         </div>

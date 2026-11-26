@@ -92,21 +92,31 @@ export async function generateJson<T>(
   opts: { fast?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
   const tier = TIERS[opts.fast ? "fast" : "accurate"];
-  const thinkingFor = (model: string) => tier.find((c) => c.model === model)!.thinking;
-  const out = (await callWithFailover(
-    job,
-    tier.map((c) => c.model),
-    "generateContent",
-    (model) =>
-      JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.2, thinkingConfig: thinkingFor(model) },
-      }),
-    opts.timeoutMs ?? 40_000,
-  )) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = out.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  return JSON.parse(text.replace(/^```json\s*|```$/g, "")) as T;
+  // If a model returns empty/truncated JSON (seen intermittently), retry once starting from the next model.
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const order = attempt === 0 ? tier : [...tier.slice(1), tier[0]];
+    const thinkingFor = (model: string) => order.find((c) => c.model === model)!.thinking;
+    try {
+      const out = (await callWithFailover(
+        job,
+        order.map((c) => c.model),
+        "generateContent",
+        (model) =>
+          JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts }],
+            generationConfig: { responseMimeType: "application/json", temperature: 0.2, thinkingConfig: thinkingFor(model) },
+          }),
+        opts.timeoutMs ?? 40_000,
+      )) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      const text = out.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+      return JSON.parse(text.trim().replace(/^```json\s*|```$/g, "")) as T;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("AI response could not be read");
 }
 
 /** 768-dim embeddings (cosine), batched. */

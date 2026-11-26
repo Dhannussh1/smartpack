@@ -53,3 +53,6 @@ test-labels/*
 !test-labels/README.md
 problem-packets/*
 !problem-packets/README.md
+
+# e2e outputs
+e2e/out/
