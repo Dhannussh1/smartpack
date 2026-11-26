@@ -6,8 +6,23 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, Camera, ImageUp, RotateCcw, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
+import { supabase } from "@/lib/supabase";
+import { finalVerdict, runEngine, type Analysis, type EngineResult } from "@/lib/engine";
+import type { Rulebook } from "@/lib/health";
 import { Button, FullPageSpinner } from "@/components/ui";
 import { ease } from "@/components/motion";
+import { ScanResult } from "@/components/ScanResult";
+
+/** Resize to ≤1600px and re-encode as JPEG so uploads stay small and fast. */
+async function toJpegBase64(f: File): Promise<string> {
+  const bmp = await createImageBitmap(f);
+  const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
 
 const TIPS = ["Lay the packet flat", "Fill the frame with the label", "Avoid glare from lights"];
 
@@ -17,6 +32,10 @@ export default function ScanPage() {
   const auth = useAuth();
   const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [result, setResult] = useState<{ a: Analysis; e: EngineResult; v: "SAFE" | "LIMIT" | "AVOID" } | null>(null);
 
   useEffect(() => {
     if (auth.status === "signed_out") router.replace("/login");
@@ -25,9 +44,50 @@ export default function ScanPage() {
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
   if (auth.status !== "signed_in") return <FullPageSpinner />;
+  const rulebook = (auth.profile?.rulebook as Rulebook | null) ?? null;
+  const userId = auth.session.user.id;
 
   function pick(f: File | undefined) {
-    if (f) setPreview(URL.createObjectURL(f));
+    if (!f) return;
+    setPreview(URL.createObjectURL(f));
+    setFile(f);
+    setResult(null);
+    setErr(null);
+  }
+
+  async function analyse() {
+    if (!file) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const image_base64 = await toJpegBase64(file);
+      const { data, error } = await supabase().functions.invoke("analyse-label", {
+        body: { image_base64, mime_type: "image/jpeg" },
+      });
+      if (error) {
+        const ctx = (error as { context?: Response }).context;
+        const detail = ctx ? await ctx.json().catch(() => null) : null;
+        throw new Error(detail?.error ?? error.message);
+      }
+      const a = data as Analysis;
+      if (!a.readable) throw new Error("Couldn't read a food label in this photo. Try a closer, sharper shot of the ingredients.");
+      a.ingredients ??= [];
+      a.claim_checks ??= [];
+      a.reasons ??= [];
+      a.tips ??= [];
+      a.alternatives ??= [];
+      const e = runEngine(a, rulebook);
+      const v = finalVerdict(a, e);
+      setResult({ a, e, v });
+      supabase()
+        .from("scans")
+        .insert({ user_id: userId, product_name: [a.product.brand, a.product.name].filter(Boolean).join(" ") || null, label_json: a, engine_json: e, verdict_json: { verdict: v, headline: a.headline }, verdict: v, score: Math.max(0, Math.min(100, Math.round(a.score))) })
+        .then(() => {});
+    } catch (x) {
+      setErr(x instanceof Error ? x.message : "Analysis failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -127,10 +187,17 @@ export default function ScanPage() {
             </motion.label>
           </div>
 
-          <Button variant="light" className="mt-3 h-12 w-full" disabled>
-            <Sparkles className="h-4 w-4" /> Analyse label (coming next)
+          <Button variant="light" className="mt-3 h-12 w-full" disabled={!file} loading={busy} onClick={analyse}>
+            <Sparkles className="h-4 w-4" /> {busy ? "Reading label & checking your profile…" : "Analyse label"}
           </Button>
+          {err && <p className="mt-3 rounded-xl bg-bad/20 px-3 py-2 text-sm text-red-200">{err}</p>}
         </div>
+
+        {result && (
+          <div className="mt-6">
+            <ScanResult a={result.a} e={result.e} verdict={result.v} />
+          </div>
+        )}
       </div>
     </main>
   );

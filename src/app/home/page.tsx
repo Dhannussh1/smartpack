@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { ArrowRight, Droplets, Flame, HeartPulse, LogOut, Pencil, ScanLine, Soup } from "lucide-react";
@@ -184,15 +184,58 @@ export default function Home() {
           className="mt-10"
         >
           <h2 className="text-lg font-semibold tracking-tight">Recent scans</h2>
+          <RecentScans userId={p.user_id} />
+        </motion.section>
+      </div>
+    </main>
+  );
+}
+
+type ScanRow = { id: string; product_name: string | null; verdict: "SAFE" | "LIMIT" | "AVOID" | null; score: number | null; created_at: string };
+
+function RecentScans({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<ScanRow[] | null>(null);
+  useEffect(() => {
+    supabase()
+      .from("scans")
+      .select("id, product_name, verdict, score, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(8)
+      .then(({ data }) => setRows((data as ScanRow[]) ?? []));
+  }, [userId]);
+
+  if (rows && rows.length > 0)
+    return (
+      <Stagger className="mt-4 space-y-2" gap={0.05}>
+        {rows.map((r) => (
+          <Item key={r.id}>
+            <div className="flex items-center gap-3 rounded-2xl border border-line bg-white p-3.5">
+              <span
+                className={cn(
+                  "w-16 shrink-0 rounded-lg py-1 text-center text-[11px] font-bold text-white",
+                  r.verdict === "SAFE" ? "bg-good" : r.verdict === "LIMIT" ? "bg-warn" : "bg-bad",
+                )}
+              >
+                {r.verdict}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">{r.product_name ?? "Unnamed product"}</span>
+              <span className="text-sm text-ink-soft tabular-nums">{r.score}/100</span>
+            </div>
+          </Item>
+        ))}
+      </Stagger>
+    );
+
+  return (
+    <>
           <div className="mt-4 flex flex-col items-center rounded-2xl border-2 border-dashed border-line bg-white px-6 py-10 text-center">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-muted">
               <ScanLine className="h-6 w-6 text-ink-faint" />
             </span>
             <p className="mt-3 font-medium">No scans yet</p>
-            <p className="mt-1 text-sm text-ink-soft">Grab any packet from your kitchen and try it.</p>
+            <p className="mt-1 text-sm text-ink-soft">{rows ? "Grab any packet from your kitchen and try it." : "Loading…"}</p>
           </div>
-        </motion.section>
-      </div>
-    </main>
+    </>
   );
 }
