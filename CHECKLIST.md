@@ -134,7 +134,7 @@ Legend: `[x]` done · `[ ]` to do · 🔴 must before demo · 🟠 should · �
 | 26 Nov | Model `gemini-2.5-flash` → `gemini-flash-latest` with low thinking (104 s → 11 s) | 2.5 closed to new users; speed |
 | 26 Nov | Light high-contrast app shell; fixed invisible header (stale dev-server CSS) | User feedback |
 | 26 Nov | Embeddings: pgvector HNSW instead of FAISS (same ANN search, no extra server) | Serverless stack |
-| 26 Nov | EMBED key returns 403 on embeddings; failover uses the other keys | Check that key's project |
+| 26 Nov | EMBED key replaced with a key from a new Google project (old one returned 403 on embeddings) | Fixed |
 | 26 Nov | 3 Gemini keys with failover across 3 models × 3 keys on 503/429 | Gemini overload during testing |
 
 ### Pending housekeeping
