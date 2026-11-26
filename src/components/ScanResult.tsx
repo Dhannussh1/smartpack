@@ -73,7 +73,7 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
 
       <Item>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-white p-4">
+          <div className="rounded-2xl border border-line bg-white p-4">
             <p className="text-xs text-ink-soft">Safe amount today</p>
             <p className="mt-1 text-2xl font-semibold">
               {e.maxServings == null ? "?" : e.maxServings === 0 ? "None" : `${e.maxServings} serving${e.maxServings === 1 ? "" : "s"}`}
@@ -82,7 +82,7 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
               1 serving = {e.perServing.grams} g{e.limitingNutrient ? ` · limited by ${e.limitingNutrient}` : ""}
             </p>
           </div>
-          <div className="rounded-2xl bg-white p-4">
+          <div className="rounded-2xl border border-line bg-white p-4">
             <p className="text-xs text-ink-soft">Sugar per serving</p>
             <p className="mt-1 text-2xl font-semibold">{e.sugarTsp ?? "?"} <span className="text-sm font-normal text-ink-soft">tsp</span></p>
             <div className="mt-1 flex flex-wrap gap-0.5">
@@ -95,7 +95,7 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
       </Item>
 
       <Item>
-        <div className="rounded-2xl bg-white p-4">
+        <div className="rounded-2xl border border-line bg-white p-4">
           <p className="font-medium">Why, for you</p>
           <ul className="mt-2 space-y-1.5 text-sm text-ink-soft">
             {a.reasons.map((r) => (
@@ -107,7 +107,7 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
 
       {a.claim_checks.length > 0 && (
         <Item>
-          <div className="rounded-2xl bg-white p-4">
+          <div className="rounded-2xl border border-line bg-white p-4">
             <p className="font-medium">Label Lie Detector · {a.claim_checks.length} claims checked, <span className={misleading.length ? "text-bad" : "text-good"}>{misleading.length} misleading</span></p>
             <ul className="mt-2 space-y-2 text-sm">
               {a.claim_checks.map((c) => (
@@ -122,7 +122,7 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
       )}
 
       <Item>
-        <div className="rounded-2xl bg-white p-4">
+        <div className="rounded-2xl border border-line bg-white p-4">
           <p className="flex items-center gap-2 font-medium"><Droplets className="h-4 w-4 text-bad" /> Ingredients · {e.hiddenSugars.length} sugar source{e.hiddenSugars.length === 1 ? "" : "s"}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {a.ingredients.map((ing, i) => {
@@ -153,11 +153,11 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
 
       <Item>
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-2xl bg-white p-4">
+          <div className="rounded-2xl border border-line bg-white p-4">
             <p className="flex items-center gap-1.5 text-xs text-ink-soft"><CalendarClock className="h-3.5 w-3.5" /> Expiry</p>
             <p className={cn("mt-1 font-medium", e.expiry.status === "expired" && "text-bad", e.expiry.status === "soon" && "text-warn", e.expiry.status === "ok" && "text-good")}>{e.expiry.text}</p>
           </div>
-          <div className="rounded-2xl bg-white p-4">
+          <div className="rounded-2xl border border-line bg-white p-4">
             <p className="text-xs text-ink-soft">Per serving</p>
             <p className="mt-1 font-medium">{e.perServing.kcal ?? "?"} kcal · {e.perServing.sodium ?? "?"} mg sodium</p>
           </div>
@@ -166,7 +166,7 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
 
       {(a.tips.length > 0 || a.alternatives.length > 0) && (
         <Item>
-          <div className="rounded-2xl bg-white p-4 text-sm">
+          <div className="rounded-2xl border border-line bg-white p-4 text-sm">
             <p className="flex items-center gap-2 font-medium"><Lightbulb className="h-4 w-4 text-brand" /> Better choices</p>
             <ul className="mt-2 space-y-1 text-ink-soft">
               {[...a.tips, ...a.alternatives.map((x) => `Try: ${x}`)].map((x) => <li key={x}>• {x}</li>)}
@@ -175,7 +175,7 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
         </Item>
       )}
 
-      <p className="pb-2 text-center text-[11px] text-white/40">Guidance, not medical advice · AI confidence {Math.round((a.confidence ?? 0) * (a.confidence > 1 ? 1 : 100))}%</p>
+      <p className="pb-2 text-center text-[11px] text-ink-soft">Guidance, not medical advice · AI confidence {Math.round((a.confidence ?? 0) * (a.confidence > 1 ? 1 : 100))}%</p>
     </Stagger>
   );
 }

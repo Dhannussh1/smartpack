@@ -1,19 +1,13 @@
-// SmartPack: photo of a food label + the user's health profile -> structured label + personalised verdict.
-// Deterministic checks (aliases, quantity, dates) also run in the browser engine; the model explains.
-import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest"; // 2.5-flash is closed to new API users
+// SmartPack: photo of a food label + the user's health profile + relevant excerpts from their own
+// health documents (vector search) -> structured label + personalised verdict.
+// Deterministic checks (aliases, quantity, dates, allergens) also run in the browser engine; the model explains.
+import { cors, generateJson, json, retrieveUserContext, userClient } from "../_shared/gemini.ts";
 
 const SYSTEM = `You are SmartPack, a careful clinical-nutrition assistant for India.
-You receive a photo of a packaged-food label and a user's health profile.
+You receive a photo of a packaged-food label, a user's health profile, and excerpts from the user's own health reports.
 1) Extract the label faithfully. Never invent numbers: use null when a value is not visible.
-2) Judge the product FOR THIS USER (conditions, goals, allergies, diet, personal daily limits).
+2) Judge the product FOR THIS USER (conditions, goals, allergies, diet, personal daily limits, lab values from their reports).
+   When a report excerpt is relevant (e.g. HbA1c, LDL, BP), quote the value in a reason.
 3) Check every front-of-pack claim against the ingredients and nutrition table (e.g. "No added sugar" but maltodextrin present = misleading; "Multigrain" but refined wheat flour/maida first = misleading).
 Return ONLY JSON matching this shape:
 {
@@ -35,25 +29,35 @@ Return ONLY JSON matching this shape:
  "confidence": number,
  "readable": boolean
 }
-Rules: score 0-100 (100 = excellent for this user). headline <= 12 words, addressed to the user. reasons: 2-4 short bullets that reference the user's own condition/goal and the label numbers. summary_en: 2 sentences for text-to-speech. summary_ta: the same in simple Tamil. If the photo is not a food label or is unreadable, set readable=false.`;
+Rules: score 0-100 (100 = excellent for this user). headline <= 12 words, addressed to the user. reasons: 2-4 short bullets that reference the user's own condition/goal/lab value and the label numbers. summary_en: 2 sentences for text-to-speech. summary_ta: the same in simple Tamil. confidence 0-1. If the photo is not a food label or is unreadable, set readable=false.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  const ctx = await userClient(req);
+  if (!ctx) return json({ error: "Not signed in" }, 401);
+  const { sb, user } = ctx;
   try {
-    const auth = req.headers.get("Authorization") ?? "";
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: auth } },
-    });
-    const { data: u } = await sb.auth.getUser();
-    if (!u.user) return json({ error: "Not signed in" }, 401);
-
     const { image_base64, mime_type, images } = await req.json();
-    const parts: unknown[] = [];
     const list: { image_base64: string; mime_type: string }[] = images ?? [{ image_base64, mime_type }];
-    for (const im of list) parts.push({ inline_data: { mime_type: im.mime_type || "image/jpeg", data: im.image_base64 } });
+    const parts: unknown[] = list.map((im) => ({ inline_data: { mime_type: im.mime_type || "image/jpeg", data: im.image_base64 } }));
 
-    const { data: profile } = await sb.from("profiles").select("*").eq("user_id", u.user.id).maybeSingle();
-    const { data: docs } = await sb.from("health_documents").select("extracted_json").eq("user_id", u.user.id).not("extracted_json", "is", null);
+    const { data: profile } = await sb.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
+    const { data: docs } = await sb
+      .from("health_documents")
+      .select("summary, extracted_json")
+      .eq("user_id", user.id)
+      .eq("status", "done");
+
+    // RAG: the user's own report findings most relevant to their conditions & goals
+    const query = [
+      "food and diet restrictions",
+      ...(profile?.conditions ?? []),
+      ...(profile?.goals ?? []),
+      profile?.health_text ?? "",
+      "blood sugar cholesterol blood pressure lab values",
+    ].join(" ");
+    const chunks = await retrieveUserContext(sb, user.id, query, 6);
+
     const age = profile?.dob ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / 3.156e10) : null;
     const userCtx = {
       age,
@@ -65,45 +69,17 @@ Deno.serve(async (req) => {
       goals: profile?.goals,
       health_text: profile?.health_text,
       daily_limits: profile?.rulebook,
-      lab_values: docs?.map((d) => d.extracted_json) ?? [],
+      lab_values: (docs ?? []).map((d) => d.extracted_json?.lab_values).filter(Boolean),
     };
-    parts.push({ text: `USER PROFILE:\n${JSON.stringify(userCtx)}\n\nToday's date: ${new Date().toISOString().slice(0, 10)}` });
-
-    // Failover: overloaded (503) or rate-limited (429) -> next model / next key.
-    const keys = ["GEMINI_KEY_VISION", "GEMINI_KEY_REASONING", "GEMINI_KEY_EMBED"]
-      .map((k) => Deno.env.get(k))
-      .filter((k): k is string => !!k);
-    const models = [MODEL, "gemini-3-flash-preview", "gemini-flash-lite-latest"];
-    const body = JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM }] },
-      contents: [{ role: "user", parts }],
-      // low thinking keeps a scan to seconds instead of ~100 s
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2, thinkingConfig: { thinkingLevel: "low" } },
+    parts.push({
+      text: `USER PROFILE:\n${JSON.stringify(userCtx)}\n\nEXCERPTS FROM USER'S HEALTH REPORTS (most relevant first):\n${
+        chunks.map((c, i) => `[${i + 1}] ${c.chunk_text}`).join("\n") || "(none uploaded)"
+      }\n\nToday's date: ${new Date().toISOString().slice(0, 10)}`,
     });
-    let res: Response | null = null;
-    let lastErr = "";
-    outer: for (const model of models) {
-      for (const key of keys) {
-        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body,
-        });
-        if (res.ok) break outer;
-        lastErr = `Gemini ${res.status} (${model}): ${(await res.text()).slice(0, 200)}`;
-        if (res.status !== 503 && res.status !== 429) break; // other errors: try next model
-      }
-    }
-    if (!res?.ok) return json({ error: lastErr || "Gemini unavailable, please retry" }, 502);
-    const out = await res.json();
-    const text = out.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
-    const parsed = JSON.parse(text.replace(/^```json\s*|```$/g, ""));
-    return json(parsed);
+
+    const result = await generateJson<Record<string, unknown>>("vision", SYSTEM, parts);
+    return json({ ...result, context_sources: chunks.map((c) => c.chunk_text) });
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    return json({ error: e instanceof Error ? e.message : String(e) }, 502);
   }
 });
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-}

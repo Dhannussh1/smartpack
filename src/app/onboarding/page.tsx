@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, FileText, FileUp, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -177,15 +178,15 @@ function OnboardingForm({
           .from("health-docs")
           .upload(path, file, { contentType: file.type || "application/octet-stream" });
         if (uErr) throw new Error(`Report upload failed: ${uErr.message}`);
-        const { error: dErr } = await sb
+        const { data: doc, error: dErr } = await sb
           .from("health_documents")
-          .insert({ user_id: userId, file_path: path, file_name: file.name, mime_type: file.type });
+          .insert({ user_id: userId, file_path: path, file_name: file.name, mime_type: file.type || "application/octet-stream", status: "processing" })
+          .select("id")
+          .single();
         if (dErr) throw new Error(`Saving report record failed: ${dErr.message}`);
+        // AI extraction + vector indexing runs in the background; progress shows on the Documents page
+        sb.functions.invoke("process-document", { body: { document_id: doc.id } }).catch(() => {});
       }
-
-      // Kick off AI processing (report extraction + embeddings). Fire-and-forget:
-      // it is fine if the function is not deployed yet.
-      sb.functions.invoke("process-profile", { body: {} }).catch(() => {});
 
       router.replace("/home");
     } catch (err) {
@@ -203,8 +204,13 @@ function OnboardingForm({
       <div className="mx-auto max-w-xl px-5 pb-20">
         <header className="flex items-center justify-between py-5">
           <Logo />
-          <span className="text-sm text-ink-soft tabular-nums">
+          <span className="flex items-center gap-3 text-sm text-ink-soft tabular-nums">
             {step + 1} / {STEPS.length}
+            {existing && (
+              <Link href="/home" className="rounded-lg border border-line bg-white px-3 py-1.5 font-medium text-ink hover:bg-muted">
+                Cancel
+              </Link>
+            )}
           </span>
         </header>
 
