@@ -8,7 +8,7 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest"; // 2.5-flash is closed to new API users
 
 const SYSTEM = `You are SmartPack, a careful clinical-nutrition assistant for India.
 You receive a photo of a packaged-food label and a user's health profile.
@@ -69,17 +69,32 @@ Deno.serve(async (req) => {
     };
     parts.push({ text: `USER PROFILE:\n${JSON.stringify(userCtx)}\n\nToday's date: ${new Date().toISOString().slice(0, 10)}` });
 
-    const key = Deno.env.get("GEMINI_KEY_VISION") ?? Deno.env.get("GEMINI_KEY_REASONING");
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-      }),
+    // Failover: overloaded (503) or rate-limited (429) -> next model / next key.
+    const keys = ["GEMINI_KEY_VISION", "GEMINI_KEY_REASONING", "GEMINI_KEY_EMBED"]
+      .map((k) => Deno.env.get(k))
+      .filter((k): k is string => !!k);
+    const models = [MODEL, "gemini-3-flash-preview", "gemini-flash-lite-latest"];
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: "user", parts }],
+      // low thinking keeps a scan to seconds instead of ~100 s
+      generationConfig: { responseMimeType: "application/json", temperature: 0.2, thinkingConfig: { thinkingLevel: "low" } },
     });
-    if (!res.ok) return json({ error: `Gemini ${res.status}: ${(await res.text()).slice(0, 300)}` }, 502);
+    let res: Response | null = null;
+    let lastErr = "";
+    outer: for (const model of models) {
+      for (const key of keys) {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body,
+        });
+        if (res.ok) break outer;
+        lastErr = `Gemini ${res.status} (${model}): ${(await res.text()).slice(0, 200)}`;
+        if (res.status !== 503 && res.status !== 429) break; // other errors: try next model
+      }
+    }
+    if (!res?.ok) return json({ error: lastErr || "Gemini unavailable, please retry" }, 502);
     const out = await res.json();
     const text = out.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
     const parsed = JSON.parse(text.replace(/^```json\s*|```$/g, ""));

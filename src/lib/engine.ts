@@ -152,7 +152,7 @@ export function runEngine(a: Analysis, rb: Rulebook | null): EngineResult {
 }
 
 function checkExpiry(d: Analysis["dates"]): EngineResult["expiry"] {
-  const raw = d.expiry;
+  const raw = d.expiry ?? (d.best_before_text?.match(/\d/) ? d.best_before_text : null);
   if (!raw) return { status: "unknown", text: d.best_before_text ?? "Expiry date not found on photo" };
   const parsed = parseDate(raw);
   if (!parsed) return { status: "unknown", text: `Printed: ${raw}` };
