@@ -43,12 +43,20 @@ export const ALLERGIES = [
   { id: "sesame", label: "Sesame" },
 ];
 
-export const DIETS = [
-  { id: "vegetarian", label: "Vegetarian" },
-  { id: "vegan", label: "Vegan" },
-  { id: "jain", label: "Jain" },
-  { id: "eggetarian", label: "Eggetarian" },
-  { id: "halal", label: "Halal" },
+/** Main diet type: pick exactly one. */
+export const DIET_TYPES = [
+  { id: "non_vegetarian", label: "Non-vegetarian", hint: "Eats meat, fish, eggs and dairy. No ingredient restrictions." },
+  { id: "eggetarian", label: "Eggetarian", hint: "Vegetarian + eggs. We flag meat, fish, gelatin and animal fats." },
+  { id: "vegetarian", label: "Vegetarian", hint: "No meat, fish or eggs; dairy is fine. We flag gelatin, egg, animal rennet, E120 (carmine)." },
+  { id: "vegan", label: "Vegan", hint: "No animal products at all. We also flag milk solids, whey, casein, ghee, honey." },
+  { id: "jain", label: "Jain", hint: "Vegetarian without onion, garlic, potato or other root vegetables. Those get flagged too." },
+];
+
+/** Extra dietary rules on top of the diet type: any number. */
+export const DIET_RULES = [
+  { id: "halal", label: "Halal", hint: "We flag pork, lard, alcohol/wine extracts and non-halal gelatin." },
+  { id: "no_beef", label: "No beef", hint: "We flag beef, beef fat (tallow) and beef gelatin." },
+  { id: "no_onion_garlic", label: "No onion / garlic", hint: "We flag onion and garlic in any form (powder, extract)." },
 ];
 
 export const GOALS = [

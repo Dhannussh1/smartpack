@@ -9,7 +9,8 @@ import {
   ACTIVITY_LABELS,
   ALLERGIES,
   CONDITIONS,
-  DIETS,
+  DIET_RULES,
+  DIET_TYPES,
   GOALS,
   ageFromDob,
   baseRulebook,
@@ -66,7 +67,13 @@ function OnboardingForm({
   const [activity, setActivity] = useState<Activity>((existing?.activity_level as Activity) ?? "moderate");
   const [conditions, setConditions] = useState<string[]>(existing?.conditions ?? []);
   const [allergies, setAllergies] = useState<string[]>(existing?.allergies ?? []);
-  const [diet, setDiet] = useState<string[]>(existing?.diet_prefs ?? []);
+  const [dietType, setDietType] = useState<string>(
+    existing?.diet_prefs.find((d) => DIET_TYPES.some((t) => t.id === d)) ?? "",
+  );
+  const [dietRules, setDietRules] = useState<string[]>(
+    existing?.diet_prefs.filter((d) => DIET_RULES.some((r) => r.id === d)) ?? [],
+  );
+  const diet = dietType ? [dietType, ...dietRules] : dietRules;
   const [goals, setGoals] = useState<string[]>(existing?.goals ?? []);
   const [healthText, setHealthText] = useState(existing?.health_text ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -90,8 +97,8 @@ function OnboardingForm({
       if (!(w >= 10 && w <= 300)) return "Weight should be between 10 and 300 kg.";
     }
     if (s === 1) {
+      if (!dietType) return "Please choose your diet type.";
       if (goals.length === 0) return "Pick at least one goal (choose “Just eat healthier” if unsure).";
-      if (healthText.trim().length < 20) return "Describe your health in a sentence or two (at least 20 characters).";
     }
     if (s === 2 && file && file.size > MAX_FILE_MB * 1024 * 1024) return `File must be under ${MAX_FILE_MB} MB.`;
     return null;
@@ -105,6 +112,7 @@ function OnboardingForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (step < STEPS.length - 1) return next(); // Enter key on an earlier step = Continue
     for (let s = 0; s < STEPS.length; s++) {
       const err = validateStep(s);
       if (err) {
@@ -268,15 +276,32 @@ function OnboardingForm({
             <Field label="Allergies / intolerances">
               <Chips options={ALLERGIES} value={allergies} onChange={setAllergies} />
             </Field>
-            <Field label="Diet preference">
-              <Chips options={DIETS} value={diet} onChange={setDiet} />
+            <Field label="Diet type" required hint="Pick one. We flag ingredients that don't fit your diet.">
+              <Chips options={DIET_TYPES} value={dietType ? [dietType] : []} onChange={(v) => setDietType(v.at(-1) ?? "")} />
+              {dietType && (
+                <span className="mt-2 block rounded-lg bg-brand-soft px-3 py-2 text-xs text-brand-dark">
+                  <b>{DIET_TYPES.find((t) => t.id === dietType)?.label}:</b>{" "}
+                  {DIET_TYPES.find((t) => t.id === dietType)?.hint}
+                </span>
+              )}
+            </Field>
+            <Field label="Extra diet rules" hint="Optional. Pick any that apply.">
+              <Chips options={DIET_RULES} value={dietRules} onChange={setDietRules} />
+              {dietRules.length > 0 && (
+                <span className="mt-2 block space-y-1 rounded-lg bg-muted px-3 py-2 text-xs text-ink-soft">
+                  {DIET_RULES.filter((r) => dietRules.includes(r.id)).map((r) => (
+                    <span key={r.id} className="block">
+                      <b className="text-ink">{r.label}:</b> {r.hint}
+                    </span>
+                  ))}
+                </span>
+              )}
             </Field>
             <Field label="Current goal" required>
               <Chips options={GOALS} value={goals} onChange={setGoals} />
             </Field>
             <Field
-              label="Describe your health condition"
-              required
+              label="Describe your health condition (optional)"
               hint="E.g. “Type 2 diabetic for 3 years, on metformin. Trying to cut sugar and lose 5 kg. Get acidity with spicy food.”"
             >
               <textarea
@@ -330,11 +355,13 @@ function OnboardingForm({
             </Button>
           )}
           {step < STEPS.length - 1 ? (
-            <Button type="button" className="flex-1" onClick={next}>
+            // distinct keys: React must not reuse the same <button> when it switches to type="submit",
+            // otherwise the click that opens the last step also submits the form
+            <Button key="continue" type="button" className="flex-1" onClick={next}>
               Continue <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button type="submit" className="flex-1" loading={saving}>
+            <Button key="submit" type="submit" className="flex-1" loading={saving}>
               {existing ? "Save profile" : "Finish setup"}
             </Button>
           )}

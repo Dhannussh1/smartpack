@@ -48,6 +48,20 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 
 **Same contract in every mode:** every provider returns the same Zod-validated JSON (`LabelExtraction`, `Verdict`), so switching modes changes zero UI code.
 
+### 2.2 Gemini API keys: one key per job
+
+| Secret name | Used by | Calls per scan | Why separate |
+|---|---|---|---|
+| `GEMINI_KEY_VISION` | `extract-label`: photo → label JSON | 1 (heaviest: image input) | Scans never blocked by other traffic |
+| `GEMINI_KEY_REASONING` | `analyse-scan` (verdict) + `process-profile` (report parsing) | 1 | Verdict quota isolated from vision |
+| `GEMINI_KEY_EMBED` | Embeddings for profile chunks, knowledge base, scan queries | 1–2 | Embeddings are frequent and cheap; isolated from the rest |
+
+- Set with: `npx supabase secrets set GEMINI_KEY_VISION=… GEMINI_KEY_REASONING=… GEMINI_KEY_EMBED=…`
+- ⚠️ **Free-tier rate limits are per Google Cloud project, not per key.** Keys in the same project share one quota. For the limits to be independent, each key must be created in its **own** Google Cloud project (AI Studio → Get API key → Create in new project).
+- Don't create projects only to multiply free quota (check Google's Gemini API terms). If more throughput is needed, enable billing on one project (Tier 1 limits, low cost at hackathon volume).
+- **Fallback chain in code:** if a key returns 429 (rate limit), retry once with backoff, then fall back to the `local` mode (Tesseract + engine), so the demo never shows a blank error.
+- Track per-key usage in a small `ai_usage` log table so we can see which job is near its limit.
+
 ---
 
 ## 3. End-to-end user flow
@@ -78,7 +92,7 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 - [x] Public GitHub repo created, repo variables set, Pages enabled → https://dhannussh1.github.io/smartpack/
 - [x] Add production URL to Supabase **Auth → URL Configuration → Redirect URLs**
 - [ ] Verify Google sign-in end to end on the live site
-- [ ] Gemini API key → `npx supabase secrets set GEMINI_API_KEY=…`
+- [ ] Gemini API keys: **3 keys, one per job** (see §2.2), set as Supabase secrets
 - [ ] PWA manifest + icons (installable on phone home screen) **(S)**
 
 ### Phase 1: Auth & onboarding **(M)**
@@ -87,7 +101,8 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 - [x] OAuth callback page (PKCE) + route guards (signed out → login, no profile → onboarding)
 - [x] Onboarding step 1: name, DOB (auto age), gender, height, weight, activity level
 - [x] Live BMI (Asian cut-offs), BMR (Mifflin–St Jeor), daily calorie need
-- [x] Onboarding step 2: conditions, allergies, diet preference, goals (chips), health paragraph (required)
+- [x] Onboarding step 2: conditions, allergies, diet type (non-veg / eggetarian / veg / vegan / Jain, with definitions), extra diet rules (halal, no beef, no onion/garlic), goals, health paragraph (optional)
+- [x] Fix: report step was skipped (Continue → Finish button reuse submitted the form)
 - [x] Onboarding step 3: optional report upload (PDF/image ≤ 10 MB) to private bucket
 - [x] Baseline **Health Rulebook** computed in code (sugar, sodium, sat-fat, carbs, protein limits from WHO/ICMR/AHA)
 - [x] Home dashboard: daily limits, BMI, conditions, goals, edit profile, sign out
@@ -190,6 +205,21 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 - [ ] 5 "problem packets" with misleading claims ready on the table
 - [ ] 3-minute script: hook → judge's own packet → hidden sugar reveal → profile switch flips verdict → Tamil voice → one architecture slide → impact close
 - [ ] Prepared answers: hallucination (engine + RAG + schema), privacy (RLS, private buckets, delete data), accuracy (measured), scale (serverless)
+
+---
+
+## 4b. What the team needs to provide
+
+| # | Item | When | Notes |
+|---|---|---|---|
+| 1 | Test Google sign-in on the live site (laptop + phone) | Now | https://dhannussh1.github.io/smartpack/ |
+| 2 | Teammates' Gmail addresses added as **test users** (Google Auth Platform → Audience) | Now | Only test users can use Google sign-in while the app is in Testing mode |
+| 3 | **20 label photos** in `smartpack/test-labels/` (back of pack: ingredients + nutrition table + dates, plus front of pack) | Before the scan pipeline | Mix: biscuits, chips, juice, instant noodles, chocolate, health drink, "diet"/"sugar-free" items, 2–3 local brands. Used for dev, engine tests and the accuracy number on the pitch slide |
+| 4 | 5 "problem packets" with misleading claims ("No added sugar", "Multigrain", "Natural") | Before demo | Physical packets for the stage |
+| 5 | 3 Gemini API keys set as Supabase secrets (§2.2) | Before the Gemini phase | Run the `secrets set` command yourself; never paste keys in chat |
+| 6 | Pick 2 demo personas (e.g. diabetic on sugar cut, gym bulking) | Before demo | Create the two accounts |
+| 7 | Phone check: camera opens, Tamil/Hindi voice available | After the result screen | Android Chrome + iPhone Safari if possible |
+| 8 | Record the backup demo video | Last day | In case the venue Wi-Fi fails |
 
 ---
 
