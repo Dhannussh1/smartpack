@@ -64,6 +64,7 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
   const urlsRef = useRef<string[]>([]);
 
   const [camOn, setCamOn] = useState(false);
+  const [camReady, setCamReady] = useState(false); // shutter stays disabled until the feed has frames
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -105,6 +106,7 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCamOn(false);
+    setCamReady(false);
   }
 
   async function startCamera() {
@@ -115,15 +117,18 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
         audio: false,
       });
       streamRef.current = stream;
-      setCamOn(true);
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
-      });
+      setCamOn(true); // the <video> mounts on this render; attachVideo connects the stream
     } catch (e) {
       setErr(cameraError(e));
+    }
+  }
+
+  /** Ref callback: runs when the <video> element actually exists, so the stream is never attached to null. */
+  function attachVideo(el: HTMLVideoElement | null) {
+    videoRef.current = el;
+    if (el && streamRef.current && el.srcObject !== streamRef.current) {
+      el.srcObject = streamRef.current;
+      el.play().then(() => setCamReady(true)).catch(() => {});
     }
   }
 
@@ -222,7 +227,7 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
           <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-night">
             {camOn ? (
               <>
-                <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+                <video ref={attachVideo} playsInline muted onLoadedMetadata={() => setCamReady(true)} onPlaying={() => setCamReady(true)} className="absolute inset-0 h-full w-full object-cover" />
                 <AnimatePresence>
                   {flash > 0 && (
                     <motion.div key={flash} className="absolute inset-0 bg-white" initial={{ opacity: 0.7 }} animate={{ opacity: 0 }} transition={{ duration: 0.35 }} />
@@ -243,7 +248,7 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
                   <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={capture}
-                    disabled={full}
+                    disabled={full || !camReady}
                     className="grid h-16 w-16 place-items-center rounded-full border-4 border-white bg-white/20 backdrop-blur disabled:opacity-40"
                     aria-label="Capture photo"
                   >

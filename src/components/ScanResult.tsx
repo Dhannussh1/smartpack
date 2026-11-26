@@ -92,10 +92,13 @@ export function ScanResult({ a, e, verdict }: { a: Analysis; e: EngineResult; ve
           <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line">
             <div className="bg-white p-4">
               <dt className="text-xs text-ink-soft">Safe amount today</dt>
-              <dd className="mt-1 text-xl font-semibold text-ink">
-                {e.maxServings == null ? "n/a" : e.maxServings === 0 ? "None" : `${e.maxServings} serving${e.maxServings === 1 ? "" : "s"}`}
+              {/* an AVOID verdict must never be paired with "N servings are fine" */}
+              <dd className={cn("mt-1 text-xl font-semibold", verdict === "AVOID" ? "text-bad" : "text-ink")}>
+                {verdict === "AVOID" ? "Best avoided" : e.maxServings == null ? "n/a" : e.maxServings === 0 ? "None" : `${e.maxServings} serving${e.maxServings === 1 ? "" : "s"}`}
               </dd>
-              <dd className="text-[11px] text-ink-faint">1 serving = {e.perServing.grams} g</dd>
+              <dd className="text-[11px] text-ink-faint">
+                {verdict === "AVOID" && e.maxServings ? `Within limits: ${e.maxServings} × ${e.perServing.grams} g, but not advised` : `1 serving = ${e.perServing.grams} g`}
+              </dd>
             </div>
             <div className="bg-white p-4">
               <dt className="text-xs text-ink-soft">Sugar per serving</dt>

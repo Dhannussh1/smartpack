@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   basePath,
   trailingSlash: true, // /login -> /login/index.html (works on GitHub Pages)
   images: { unoptimized: true },
+  devIndicators: false, // no "N" badge in demo recordings
   turbopack: {
     rules: {
       "*.css": {
