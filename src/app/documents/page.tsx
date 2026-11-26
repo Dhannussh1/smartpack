@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AlertCircle, CheckCircle2, Eye, FileText, FileUp, Loader2, RefreshCw, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageHeader } from "@/components/AppShell";
 import { cn } from "@/components/ui";
 
 const MAX_MB = 10;
@@ -140,21 +140,21 @@ function Documents({ userId }: { userId: string }) {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">My health documents</h1>
-      <p className="mt-1 text-sm text-ink-soft">
-        Upload checkup reports. SmartPack reads the lab values and remembers them, so every scan and answer is checked against your real numbers.
-      </p>
+      <PageHeader
+        eyebrow="My health"
+        title="Health documents"
+        description="Upload checkup reports. SmartPack reads the lab values and remembers them, so every scan and answer is checked against your real numbers."
+      />
 
       <motion.label
-        whileHover={{ scale: 1.005 }}
-        whileTap={{ scale: 0.99 }}
+        whileTap={{ scale: 0.995 }}
         className={cn(
-          "mt-6 flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed border-brand/40 bg-white p-5 transition-colors hover:border-brand hover:bg-brand-soft/40",
+          "mt-8 flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-ink-faint/50 bg-white p-6 transition-colors hover:border-brand",
           uploading && "pointer-events-none opacity-70",
         )}
       >
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand text-white">
-          {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileUp className="h-6 w-6" />}
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+          {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileUp className="h-5 w-5" />}
         </span>
         <span className="flex-1">
           <span className="block font-semibold text-ink">{uploading ? "Uploading…" : "Upload a new report"}</span>

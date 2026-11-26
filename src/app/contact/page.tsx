@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { CheckCircle2, Code2, MessageSquare, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageHeader } from "@/components/AppShell";
 import { Button, Field, inputClass, cn } from "@/components/ui";
 
 export default function ContactPage() {
@@ -32,10 +32,9 @@ function Contact({ userId, email }: { userId: string; email: string }) {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Contact us</h1>
-      <p className="mt-1 text-sm text-ink-soft">Found a wrong verdict, a label we couldn&apos;t read, or have an idea? Tell the SmartPack team.</p>
+      <PageHeader eyebrow="Support" title="Contact the team" description="Found a wrong verdict, a label we couldn't read, or have an idea? We read every message." />
 
-      <form onSubmit={submit} className="mt-6 space-y-4 rounded-2xl border border-line bg-white p-5">
+      <form onSubmit={submit} className="mt-8 max-w-2xl space-y-4 rounded-2xl border border-line bg-white p-6">
         <Field label="Your message" hint="Include the product name if it's about a scan.">
           <textarea
             required

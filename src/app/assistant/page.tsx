@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Bot, FileHeart, Send, Sparkles, Trash2, Volume2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/useAuth";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageHeader } from "@/components/AppShell";
 import { cn } from "@/components/ui";
 
 type Meta = { reply_ta?: string; used_documents?: boolean; sources?: string[]; suggestions?: string[] };
@@ -93,22 +93,21 @@ function Chat({ userId, profile }: { userId: string; profile: Profile | null }) 
   const lastAssistant = [...(msgs ?? [])].reverse().find((m) => m.role === "assistant");
 
   return (
-    <div className="flex min-h-[calc(100dvh-8rem)] flex-col">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-ink">
-            <Bot className="h-6 w-6 text-brand" /> SmartPack Assistant
-          </h1>
-          <p className="mt-1 text-sm text-ink-soft">Ask anything about food. Answers use your profile, reports and recent scans.</p>
-        </div>
-        {msgs && msgs.length > 0 && (
-          <button onClick={clear} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-soft hover:text-bad">
-            <Trash2 className="h-3.5 w-3.5" /> Clear
-          </button>
-        )}
-      </div>
+    <div className="mx-auto flex min-h-[calc(100dvh-12rem)] max-w-3xl flex-col">
+      <PageHeader
+        eyebrow="Assistant"
+        title={<span className="inline-flex items-center gap-3"><Bot className="h-8 w-8 text-brand" strokeWidth={1.6} /> Ask SmartPack</span>}
+        description="Meals, snacks, swaps, portions: answers use your profile, your reports and your recent scans."
+        actions={
+          msgs && msgs.length > 0 ? (
+            <button onClick={clear} className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink-soft hover:text-bad">
+              <Trash2 className="h-4 w-4" /> Clear chat
+            </button>
+          ) : undefined
+        }
+      />
 
-      <div className="mt-5 flex-1 space-y-4">
+      <div className="mt-8 flex-1 space-y-4">
         {msgs?.length === 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-line bg-white p-5">
             <p className="font-semibold text-ink">Hi {first} 👋</p>
@@ -172,7 +171,8 @@ function Chat({ userId, profile }: { userId: string; profile: Profile | null }) 
         <div ref={endRef} />
       </div>
 
-      <div className="sticky bottom-0 -mx-5 mt-4 border-t border-line bg-page/95 px-5 pt-3 pb-4 backdrop-blur">
+      {/* sits above the mobile bottom tab bar; flush to the bottom on desktop */}
+      <div className="sticky bottom-[68px] -mx-5 mt-4 border-t border-line bg-page/95 px-5 pt-3 pb-4 backdrop-blur sm:-mx-8 sm:px-8 lg:bottom-0 lg:mx-0 lg:rounded-t-2xl lg:border-x lg:px-5">
         {!busy && lastAssistant?.meta?.suggestions && lastAssistant.meta.suggestions.length > 0 && (
           <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
             {lastAssistant.meta.suggestions.map((s) => (
