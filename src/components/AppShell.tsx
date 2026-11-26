@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { Session } from "@supabase/supabase-js";
-import { Bot, FileHeart, HeartPulse, History, Home, LogOut, Mail, Menu, ScanLine, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Bot, FileHeart, HeartPulse, History, Home, LogOut, Mail, Menu, ScanLine, UserRound, X, type LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, type Profile } from "@/lib/useAuth";
 import { FullPageSpinner, Logo, cn } from "./ui";
@@ -24,7 +24,8 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "My health",
     items: [
-      { href: "/onboarding", label: "Health profile", icon: HeartPulse },
+      { href: "/dashboard", label: "Dashboard", icon: HeartPulse },
+      { href: "/profile", label: "About me", icon: UserRound },
       { href: "/documents", label: "Documents", icon: FileHeart },
     ],
   },
@@ -34,8 +35,8 @@ const TABS: NavItem[] = [
   { href: "/home", label: "Overview", icon: Home },
   { href: "/assistant", label: "Assistant", icon: Bot },
   { href: "/scan", label: "Scan", icon: ScanLine },
+  { href: "/dashboard", label: "Health", icon: HeartPulse },
   { href: "/history", label: "History", icon: History },
-  { href: "/documents", label: "Docs", icon: FileHeart },
 ];
 
 export type SignedIn = { session: Session; profile: Profile | null };
@@ -235,21 +236,37 @@ export function PageHeader({
   title,
   description,
   actions,
+  back,
 }: {
   eyebrow?: string;
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  /** Back link shown above the heading (inner pages). */
+  back?: { href: string; label: string };
 }) {
   return (
     <header className="flex flex-col gap-4 border-b border-line pb-8 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
+        {back && <BackLink href={back.href} label={back.label} className="mb-5" />}
         {eyebrow && <p className="text-xs font-semibold tracking-[0.08em] text-brand uppercase">{eyebrow}</p>}
         <h1 className="mt-2 font-display text-4xl leading-[1.05] tracking-tight text-ink sm:text-[44px]">{title}</h1>
         {description && <p className="mt-3 text-[15px] leading-relaxed text-ink-soft">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
     </header>
+  );
+}
+
+/** "← Back to …" link with a generous tap target. */
+export function BackLink({ href, label, className }: { href: string; label: string; className?: string }) {
+  return (
+    <Link
+      href={href}
+      className={cn("-ml-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:bg-muted hover:text-ink", className)}
+    >
+      <ArrowLeft className="h-4 w-4" /> {label}
+    </Link>
   );
 }
 

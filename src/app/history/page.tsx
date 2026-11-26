@@ -9,6 +9,8 @@ import type { Analysis, EngineResult } from "@/lib/engine";
 import { AppShell, PageHeader } from "@/components/AppShell";
 import { ScanResult } from "@/components/ScanResult";
 import { AskProduct } from "@/components/AskProduct";
+import { IAteThis } from "@/components/IAteThis";
+import type { Rulebook } from "@/lib/health";
 import { VerdictBadge, type ScanRow } from "@/components/VerdictBadge";
 import { cn, inputClass } from "@/components/ui";
 
@@ -18,17 +20,17 @@ const FILTERS = ["ALL", "SAFE", "LIMIT", "AVOID"] as const;
 export default function HistoryPage() {
   return (
     <AppShell>
-      {({ session }) => (
+      {({ session, profile }) => (
         // useSearchParams needs a Suspense boundary in a static export
         <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-muted" />}>
-          <HistoryView userId={session.user.id} />
+          <HistoryView userId={session.user.id} rulebook={(profile?.rulebook as Rulebook | null) ?? null} />
         </Suspense>
       )}
     </AppShell>
   );
 }
 
-function HistoryView({ userId }: { userId: string }) {
+function HistoryView({ userId, rulebook }: { userId: string; rulebook: Rulebook | null }) {
   const params = useSearchParams();
   const router = useRouter();
   const openId = params.get("id");
@@ -38,7 +40,7 @@ function HistoryView({ userId }: { userId: string }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  return openId ? <Detail id={openId} onBack={() => open(null)} /> : <List userId={userId} onOpen={open} />;
+  return openId ? <Detail id={openId} userId={userId} rulebook={rulebook} onBack={() => open(null)} /> : <List userId={userId} onOpen={open} />;
 }
 
 function List({ userId, onOpen }: { userId: string; onOpen: (id: string) => void }) {
@@ -64,7 +66,7 @@ function List({ userId, onOpen }: { userId: string; onOpen: (id: string) => void
 
   return (
     <>
-      <PageHeader eyebrow="History" title="Every packet you've checked" description="Open any scan to see the full verdict again, or ask a follow-up question about it." />
+      <PageHeader back={{ href: "/home", label: "Overview" }} eyebrow="History" title="Every packet you've checked" description="Open any scan to see the full verdict again, or ask a follow-up question about it." />
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="no-scrollbar flex gap-1 overflow-x-auto rounded-xl border border-line bg-white p-1">
@@ -120,7 +122,7 @@ function List({ userId, onOpen }: { userId: string; onOpen: (id: string) => void
   );
 }
 
-function Detail({ id, onBack }: { id: string; onBack: () => void }) {
+function Detail({ id, userId, rulebook, onBack }: { id: string; userId: string; rulebook: Rulebook | null; onBack: () => void }) {
   const [scan, setScan] = useState<FullScan | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
@@ -156,7 +158,15 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
               verdict={(scan.verdict ?? "LIMIT") as "SAFE" | "LIMIT" | "AVOID"}
             />
           </div>
-          <div className="mt-8">
+          <div className="mt-8 space-y-8">
+            <IAteThis
+              userId={userId}
+              scanId={scan.id}
+              a={scan.label_json}
+              e={scan.engine_json}
+              verdict={(scan.verdict ?? "LIMIT") as "SAFE" | "LIMIT" | "AVOID"}
+              rulebook={rulebook}
+            />
             <AskProduct label={{ ...scan.label_json, verdict: scan.verdict }} />
           </div>
         </>

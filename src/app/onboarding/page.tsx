@@ -188,7 +188,7 @@ function OnboardingForm({
         sb.functions.invoke("process-document", { body: { document_id: doc.id } }).catch(() => {});
       }
 
-      router.replace("/home");
+      router.replace(existing ? "/profile" : "/home"); // editing returns to About me; first setup goes to Overview
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while saving.");
       setSaving(false);
@@ -207,7 +207,7 @@ function OnboardingForm({
           <span className="flex items-center gap-3 text-sm text-ink-soft tabular-nums">
             {step + 1} / {STEPS.length}
             {existing && (
-              <Link href="/home" className="rounded-lg border border-line bg-white px-3 py-1.5 font-medium text-ink hover:bg-muted">
+              <Link href="/profile" className="rounded-lg border border-line bg-white px-3 py-1.5 font-medium text-ink hover:bg-muted">
                 Cancel
               </Link>
             )}

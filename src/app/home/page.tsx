@@ -7,7 +7,9 @@ import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/useAuth";
 import { ALLERGIES, CONDITIONS, DIET_RULES, DIET_TYPES, GOALS, bmiCategory, type Rulebook } from "@/lib/health";
 import { Pill, cn } from "@/components/ui";
-import { CountUp, Item, Stagger } from "@/components/motion";
+import { Item, Stagger } from "@/components/motion";
+import { BudgetMeter } from "@/components/charts";
+import { localDay, totalsFor, useIntake } from "@/lib/intake";
 import { AppShell, PageHeader, Section } from "@/components/AppShell";
 import { VerdictBadge, type ScanRow } from "@/components/VerdictBadge";
 
@@ -27,15 +29,6 @@ function Overview({ p }: { p: Profile }) {
   const rb = p.rulebook as Rulebook | null;
   const cat = p.bmi ? bmiCategory(p.bmi) : null;
   const first = p.full_name.split(" ")[0];
-
-  const limits = rb
-    ? [
-        { label: "Calories", value: rb.daily_kcal, unit: "kcal", hint: "daily energy need" },
-        { label: "Added sugar", value: rb.sugar_g_max, unit: "g", hint: `about ${Math.round(rb.sugar_g_max / 4)} teaspoons`, key: "hidden_sugar" },
-        { label: "Sodium", value: rb.sodium_mg_max, unit: "mg", hint: `about ${(rb.sodium_mg_max / 400).toFixed(1)} g of salt`, key: "sodium" },
-        { label: "Saturated fat", value: rb.sat_fat_g_max, unit: "g", hint: "maximum per day", key: "saturated_fat" },
-      ]
-    : [];
 
   const actions = [
     { href: "/scan", icon: ScanLine, title: "Scan a label", text: "Up to 4 photos of a packet", primary: true },
@@ -79,32 +72,19 @@ function Overview({ p }: { p: Profile }) {
       </Stagger>
 
       <Section
-        title="Your daily limits"
+        title="Today vs your limits"
         action={
-          <Link href="/onboarding" className="text-sm font-medium text-brand hover:underline">
-            Edit profile
-          </Link>
+          <span className="flex gap-4">
+            <Link href="/dashboard" className="text-sm font-medium text-brand hover:underline">
+              Dashboard
+            </Link>
+            <Link href="/profile" className="text-sm font-medium text-brand hover:underline">
+              About me
+            </Link>
+          </span>
         }
       >
-        {/* gap-px over a line-coloured background = hairline dividers at every breakpoint */}
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line lg:grid-cols-4">
-          {limits.map((l) => {
-            const watched = l.key && rb?.watch.includes(l.key);
-            return (
-              <div key={l.label} className="bg-white p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13px] text-ink-soft">{l.label}</span>
-                  {watched && <Pill tone="bad">Watch</Pill>}
-                </div>
-                <p className="mt-3 text-3xl font-semibold tracking-tight text-ink tabular-nums">
-                  <CountUp value={l.value} />
-                  <span className="ml-1 text-sm font-normal text-ink-soft">{l.unit}</span>
-                </p>
-                <p className="mt-1 text-xs text-ink-faint">{l.hint}</p>
-              </div>
-            );
-          })}
-        </div>
+        {rb && <TodayMeters userId={p.user_id} rb={rb} />}
         <div className="mt-4 flex flex-wrap gap-2">
           {cat && p.bmi && <Pill tone={cat.tone}>BMI {p.bmi} · {cat.label}</Pill>}
           {[...p.conditions, ...p.allergies, ...p.diet_prefs].map((c) => (
@@ -132,6 +112,28 @@ function Overview({ p }: { p: Profile }) {
           <Snapshot userId={p.user_id} />
         </div>
       </div>
+    </>
+  );
+}
+
+/** Today's logged intake against personal limits (from "I ate this"). */
+function TodayMeters({ userId, rb }: { userId: string; rb: Rulebook }) {
+  const { rows } = useIntake(userId, 1);
+  const t = totalsFor(rows ?? [], localDay());
+  return (
+    <>
+      {/* gap-px over a line-coloured background = hairline dividers at every breakpoint */}
+      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <BudgetMeter label="Calories" used={t.calories} limit={rb.daily_kcal} unit="kcal" />
+        <BudgetMeter label="Added sugar" used={t.sugar_g} limit={rb.sugar_g_max} unit="g" decimals={1} />
+        <BudgetMeter label="Sodium" used={t.sodium_mg} limit={rb.sodium_mg_max} unit="mg" />
+        <BudgetMeter label="Saturated fat" used={t.sat_fat_g} limit={rb.sat_fat_g_max} unit="g" decimals={1} />
+      </div>
+      {rows && rows.length === 0 && (
+        <p className="mt-2 text-xs text-ink-faint">
+          Nothing logged today. Tap <span className="font-medium text-ink-soft">I ate this</span> after a scan to fill these up.
+        </p>
+      )}
     </>
   );
 }

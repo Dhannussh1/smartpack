@@ -45,7 +45,8 @@ function Chat({ userId, profile }: { userId: string; profile: Profile | null }) 
       .eq("user_id", userId)
       .order("created_at", { ascending: true })
       .limit(60)
-      .then(({ data }) => setMsgs((data as Msg[]) ?? []));
+      // merge: keep messages sent before history arrived (they have local string ids, DB rows have numeric ids)
+      .then(({ data }) => setMsgs((cur) => [...((data as Msg[]) ?? []), ...(cur ?? []).filter((m) => typeof m.id === "string")]));
   }, [userId]);
 
   useEffect(() => {
@@ -54,12 +55,13 @@ function Chat({ userId, profile }: { userId: string; profile: Profile | null }) 
 
   async function send(content: string) {
     const q = content.trim();
-    if (!q || busy || !msgs) return;
+    // Don't wait for history to load: sending early used to drop the message silently on slow networks.
+    if (!q || busy) return;
     setErr(null);
     setText("");
     const sb = supabase();
     const userMsg: Msg = { id: `u${crypto.randomUUID()}`, role: "user", content: q };
-    const next = [...msgs, userMsg];
+    const next = [...(msgs ?? []), userMsg];
     setMsgs(next);
     setBusy(true);
     sb.from("chat_messages").insert({ user_id: userId, role: "user", content: q }).then(() => {});
@@ -95,6 +97,7 @@ function Chat({ userId, profile }: { userId: string; profile: Profile | null }) 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-12rem)] max-w-3xl flex-col">
       <PageHeader
+        back={{ href: "/home", label: "Overview" }}
         eyebrow="Assistant"
         title={<span className="inline-flex items-center gap-3"><Bot className="h-8 w-8 text-brand" strokeWidth={1.6} /> Ask SmartPack</span>}
         description="Meals, snacks, swaps, portions: answers use your profile, your reports and your recent scans."

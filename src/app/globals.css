@@ -26,6 +26,20 @@
   --font-display: var(--font-serif);
 }
 
+/* Real CSS variables for inline styles and SVG charts. `@theme inline` values are baked into utility
+   classes and are NOT emitted as variables, so var(--color-…) is undefined at runtime. */
+:root {
+  /* chart marks (validated: normal ΔE ≥ 24, CVD ΔE ≥ 16; amber < 3:1 on white → always paired with a text label) */
+  --chart-good: #1f7a4d;
+  --chart-warn: #c99a1e;
+  --chart-bad: #b3341f;
+  --chart-track: #ece8de;
+  --chart-grid: #e5e1d6;
+  --chart-ink-soft: #5a615d;
+  --chart-ink-faint: #8f958f;
+  --chart-hover: #f1eee6;
+}
+
 body {
   background: var(--color-page);
   color: var(--color-ink);

@@ -11,6 +11,7 @@ import { AppShell, PageHeader } from "@/components/AppShell";
 import { Button, cn } from "@/components/ui";
 import { ScanResult } from "@/components/ScanResult";
 import { AskProduct } from "@/components/AskProduct";
+import { IAteThis } from "@/components/IAteThis";
 
 const MAX_PHOTOS = 4;
 const SLOT_HINTS = ["Ingredients", "Nutrition table", "Front of pack", "Dates / extra"];
@@ -69,6 +70,7 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<{ a: Analysis; e: EngineResult; v: "SAFE" | "LIMIT" | "AVOID" } | null>(null);
+  const [scanId, setScanId] = useState<string | null>(null);
   const [flash, setFlash] = useState(0);
 
   const full = photos.length >= MAX_PHOTOS;
@@ -157,6 +159,7 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
     setBusy(true);
     setErr(null);
     setResult(null);
+    setScanId(null);
     try {
       const budget = Math.floor(TOTAL_BUDGET_B64 / photos.length);
       const images = await Promise.all(photos.map(async (p) => ({ image_base64: await toJpegBase64(p.blob, budget), mime_type: "image/jpeg" })));
@@ -191,7 +194,9 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
           verdict: v,
           score: Math.max(0, Math.min(100, Math.round(a.score))),
         })
-        .then(() => {});
+        .select("id")
+        .single()
+        .then(({ data }) => setScanId(data?.id ?? null)); // links "I ate this" to the saved scan
     } catch (x) {
       setErr(x instanceof Error ? x.message : "Analysis failed");
     } finally {
@@ -209,6 +214,7 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
   return (
     <>
       <PageHeader
+        back={{ href: "/home", label: "Overview" }}
         eyebrow="Scan"
         title="Check a packet"
         description="Add up to four photos: the ingredients list, the nutrition table, the front of the pack and the dates. More angles give a more accurate verdict."
@@ -367,7 +373,8 @@ function Scanner({ userId, profile }: { userId: string; profile: Profile | null 
       {result && (
         <div id="scan-result" className="mt-12 scroll-mt-24 border-t border-line pt-12">
           <ScanResult a={result.a} e={result.e} verdict={result.v} />
-          <div className="mt-8">
+          <div className="mt-8 space-y-8">
+            <IAteThis userId={userId} scanId={scanId} a={result.a} e={result.e} verdict={result.v} rulebook={rulebook} />
             <AskProduct label={{ ...result.a, verdict: result.v }} />
           </div>
         </div>

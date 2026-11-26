@@ -32,7 +32,7 @@ function Contact({ userId, email }: { userId: string; email: string }) {
 
   return (
     <>
-      <PageHeader eyebrow="Support" title="Contact the team" description="Found a wrong verdict, a label we couldn't read, or have an idea? We read every message." />
+      <PageHeader back={{ href: "/home", label: "Overview" }} eyebrow="Support" title="Contact the team" description="Found a wrong verdict, a label we couldn't read, or have an idea? We read every message." />
 
       <form onSubmit={submit} className="mt-8 max-w-2xl space-y-4 rounded-2xl border border-line bg-white p-6">
         <Field label="Your message" hint="Include the product name if it's about a scan.">

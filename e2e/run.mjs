@@ -39,7 +39,7 @@ async function signIn(page, device, slow) {
   await shot(page, `${device}-02-login`);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL(/\/home\/?$/, { timeout: 30000 });
-  await page.getByText("Your daily limits").waitFor({ timeout: 20000 });
+  await page.getByText("Today vs your limits").waitFor({ timeout: 20000 });
 }
 
 async function scanFlow(page, device, files, slow) {
@@ -109,12 +109,12 @@ async function run(device) {
   await step(device, "Navigation (sidebar / bottom tabs / menu drawer)", async () => {
     if (isMobile) {
       await page.getByRole("button", { name: "Open menu" }).click();
-      await page.getByRole("link", { name: "Health profile" }).waitFor();
+      await page.getByRole("link", { name: "Documents", exact: true }).filter({ visible: true }).waitFor();
+      await pause(page, 600); // let the drawer finish sliding in
       await shot(page, `${device}-04-menu`);
-      await page.getByRole("button", { name: "Close menu" }).click();
-      await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Docs" }).click();
+      await page.getByRole("link", { name: "Documents", exact: true }).filter({ visible: true }).first().click();
     } else {
-      await page.getByRole("link", { name: "Documents" }).first().click();
+      await page.getByRole("link", { name: "Documents", exact: true }).filter({ visible: true }).first().click();
     }
     await page.getByText("Health documents").first().waitFor();
     await page.getByText("Analysed").first().waitFor({ timeout: 15000 });
@@ -154,6 +154,18 @@ async function run(device) {
     return `${verdict} in ${Math.round((Date.now() - t) / 1000)} s`;
   });
 
+  await step(device, "I ate this → logged with today's budget", async () => {
+    const btn = page.getByRole("button", { name: "I ate this" });
+    await btn.scrollIntoViewIfNeeded();
+    await page.getByRole("button", { name: "More servings" }).click();
+    await btn.click();
+    await page.getByText(/Logged 1\.5 servings/).waitFor({ timeout: 15000 });
+    await page.getByText("Sugar today").waitFor();
+    await pause(page, slow ? 2500 : 600);
+    await shot(page, `${device}-07b-ate-this`);
+    return "1.5 servings logged";
+  });
+
   await step(device, "Ask about this product (uses reports)", async () => {
     const card = page.getByText("Ask about this product").locator("xpath=ancestor::div[contains(@class,'rounded-2xl')][1]");
     await card.scrollIntoViewIfNeeded();
@@ -171,8 +183,11 @@ async function run(device) {
     const input = page.getByPlaceholder("Ask about any food, meal or product…");
     if (slow) await input.pressSequentially("What should I eat for an evening snack?", { delay: 30 });
     else await input.fill("Suggest a breakfast that fits my limits");
+    const before = await page.getByText("Used your reports").count();
     await page.getByRole("button", { name: "Send" }).click();
-    await page.getByText("Used your reports").first().waitFor({ timeout: 60000 });
+    // a NEW reply must arrive (old replies from earlier runs may already be on screen)
+    for (let i = 0; i < 240 && (await page.getByText("Used your reports").count()) <= before; i++) await pause(page, 250);
+    if ((await page.getByText("Used your reports").count()) <= before) throw new Error("no new personalised reply within 60 s");
     await pause(page, slow ? 5000 : 800);
     await shot(page, `${device}-09-assistant`);
     return "reply used reports";
@@ -188,6 +203,55 @@ async function run(device) {
     await page.getByText("Why, for you").waitFor({ timeout: 15000 });
     await pause(page, slow ? 2500 : 600);
     return "detail reopened";
+  });
+
+  await step(device, "Health dashboard: budget, 7-day charts, lab ranges, scans", async () => {
+    if (isMobile) await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Health" }).click();
+    else await page.getByRole("link", { name: "Dashboard", exact: true }).filter({ visible: true }).first().click();
+    await page.getByText("Your health at a glance").waitFor();
+    await page.getByText("Eaten today").waitFor();
+    await page.getByRole("button", { name: /^Remove / }).first().waitFor({ timeout: 15000 }); // data loads after the heading
+    const eaten = await page.getByRole("button", { name: /^Remove / }).count();
+    if (eaten < 1) throw new Error("logged item missing from 'Eaten today'");
+    const meterText = await page.getByRole("meter").first().getAttribute("aria-label");
+    await page.getByText("Added sugar per day").waitFor();
+    const bars = await page.locator(".recharts-bar-rectangle").count();
+    await page.getByText("green band = typical normal range").waitFor({ timeout: 15000 });
+    const labs = await page.getByText(/^normal /).count();
+    await page.getByText("Products checked").waitFor({ timeout: 15000 });
+    await pause(page, slow ? 2500 : 600);
+    await shot(page, `${device}-12a-dashboard-top`);
+    await page.getByText("Lab values").first().scrollIntoViewIfNeeded();
+    await pause(page, slow ? 2500 : 600);
+    await shot(page, `${device}-12b-dashboard-labs`);
+    if (labs < 5) throw new Error(`only ${labs} lab range bars`);
+    return `${eaten} eaten item(s), ${bars} day bars, ${labs} lab range bars; ${meterText}`;
+  });
+
+  await step(device, "About me shows profile; back link returns", async () => {
+    await page.getByRole("link", { name: "About me", exact: true }).filter({ visible: true }).first().click();
+    await page.getByText("Personal details").waitFor();
+    await page.getByText("Arun Kumar").filter({ visible: true }).first().waitFor();
+    await page.getByText("Your daily limits").waitFor();
+    await shot(page, `${device}-13-about-me`);
+    await page.getByRole("link", { name: "Dashboard", exact: true }).filter({ visible: true }).first().click();
+    await page.getByText("Your health at a glance").waitFor();
+    await page.getByRole("link", { name: "Overview", exact: true }).filter({ visible: true }).first().click();
+    await page.waitForURL(/\/home\/?$/);
+    return "about me → back → dashboard → back → overview";
+  });
+
+  await step(device, "Remove logged item updates budget", async () => {
+    await page.goto(`${BASE}/dashboard/`);
+    await page.getByText("Eaten today").waitFor();
+    await page.getByRole("button", { name: /^Remove / }).first().waitFor({ timeout: 15000 });
+    const before = await page.getByRole("button", { name: /^Remove / }).count();
+    await page.getByRole("button", { name: /^Remove / }).first().click();
+    for (let i = 0; i < 40 && (await page.getByRole("button", { name: /^Remove / }).count()) >= before; i++) await pause(page, 250);
+    const after = await page.getByRole("button", { name: /^Remove / }).count();
+    if (after >= before) throw new Error(`still ${after} items after remove`);
+    if (!(await page.getByText("Nothing logged yet").count()) && after === 0) throw new Error("empty state not shown");
+    return `${before} → ${after}`;
   });
 
   await step(device, "Health profile (edit) loads with saved values", async () => {

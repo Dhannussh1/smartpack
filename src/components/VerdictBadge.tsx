@@ -4,6 +4,7 @@ export type Verdict = "SAFE" | "LIMIT" | "AVOID" | null;
 export type ScanRow = { id: string; product_name: string | null; verdict: Verdict; score: number | null; created_at: string };
 
 export function VerdictBadge({ v, className }: { v: Verdict; className?: string }) {
+  if (!v) return <span className={cn("inline-flex w-16 shrink-0", className)} aria-hidden />; // keep column alignment, no empty pill
   return (
     <span
       className={cn(

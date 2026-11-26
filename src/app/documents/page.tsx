@@ -141,6 +141,7 @@ function Documents({ userId }: { userId: string }) {
   return (
     <>
       <PageHeader
+        back={{ href: "/dashboard", label: "Dashboard" }}
         eyebrow="My health"
         title="Health documents"
         description="Upload checkup reports. SmartPack reads the lab values and remembers them, so every scan and answer is checked against your real numbers."

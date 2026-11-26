@@ -37,6 +37,7 @@ if (pe) throw pe;
 // fresh start for the demo: clear old scans + chat
 await sb.from("scans").delete().eq("user_id", uid);
 await sb.from("chat_messages").delete().eq("user_id", uid);
+await sb.from("daily_intake").delete().eq("user_id", uid);
 // remove the placeholder record from the very first upload test
 const { data: junk } = await sb.from("health_documents").select("id, file_path").eq("user_id", uid).eq("file_name", "test.pdf");
 for (const j of junk ?? []) {
