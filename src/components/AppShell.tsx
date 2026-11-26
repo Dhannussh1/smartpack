@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { FileHeart, HeartPulse, Home, LogIn, LogOut, Mail, Menu, ScanLine, X } from "lucide-react";
+import { Bot, FileHeart, HeartPulse, Home, LogIn, LogOut, Mail, Menu, ScanLine, X } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useAuth, type Profile } from "@/lib/useAuth";
@@ -13,6 +13,7 @@ import { FullPageSpinner, Logo, cn } from "./ui";
 const LINKS = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/scan", label: "Scan a label", icon: ScanLine },
+  { href: "/assistant", label: "Chat assistant", icon: Bot },
   { href: "/onboarding", label: "Health profile", icon: HeartPulse },
   { href: "/documents", label: "My documents", icon: FileHeart },
   { href: "/contact", label: "Contact", icon: Mail },

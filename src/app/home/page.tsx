@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { ArrowRight, ChevronRight, Droplets, FileHeart, Flame, HeartPulse, Pencil, ScanLine, Soup } from "lucide-react";
+import { ArrowRight, Bot, ChevronRight, Droplets, FileHeart, Flame, HeartPulse, Pencil, ScanLine, Soup } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/useAuth";
 import { ALLERGIES, CONDITIONS, DIET_RULES, DIET_TYPES, GOALS, bmiCategory, type Rulebook } from "@/lib/health";
@@ -111,6 +111,17 @@ function Home({ p }: { p: Profile }) {
           ))}
         </div>
       </section>
+
+      <Link href="/assistant" className="mt-8 flex items-center gap-3 rounded-2xl border border-line bg-white p-5 transition-colors hover:border-brand/50">
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand text-white">
+          <Bot className="h-5 w-5" />
+        </span>
+        <span className="flex-1">
+          <span className="block font-semibold text-ink">Ask the assistant</span>
+          <span className="block text-sm text-ink-soft">&ldquo;What can I eat for a snack?&rdquo; Answers from your profile & reports</span>
+        </span>
+        <ChevronRight className="h-5 w-5 text-ink-faint" />
+      </Link>
 
       <DocsCard userId={p.user_id} />
 
