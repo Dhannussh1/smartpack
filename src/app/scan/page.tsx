@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Camera, ImageUp } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft, Camera, ImageUp, RotateCcw, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
-import { Button, Card, FullPageSpinner } from "@/components/ui";
+import { Button, FullPageSpinner } from "@/components/ui";
+import { ease } from "@/components/motion";
+
+const TIPS = ["Lay the packet flat", "Fill the frame with the label", "Avoid glare from lights"];
 
 // Step 1 of the scan flow: capture or upload the label photo.
 // The analysis pipeline (OCR → engine → personalised verdict) is wired up next.
@@ -27,40 +31,107 @@ export default function ScanPage() {
   }
 
   return (
-    <main className="mx-auto min-h-dvh max-w-xl px-5 pb-16">
-      <header className="py-5">
-        <Link href="/home" className="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Link>
-      </header>
-      <h1 className="text-2xl font-semibold tracking-tight">Scan a label</h1>
-      <p className="mt-1 text-sm text-ink-soft">Photograph the ingredients list and nutrition table, flat and well lit.</p>
+    <main className="min-h-dvh bg-night text-white">
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col px-5 pb-8">
+        <header className="flex items-center justify-between py-5">
+          <Link href="/home" className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-white/70 hover:bg-white/10 hover:text-white">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Link>
+          <span className="text-sm font-medium">Scan a label</span>
+          <span className="w-16" />
+        </header>
 
-      <Card className="mt-6 p-0 overflow-hidden">
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="Label preview" className="max-h-[60vh] w-full object-contain bg-muted" />
-        ) : (
-          <div className="grid aspect-[4/3] place-items-center bg-muted text-ink-faint">
-            <Camera className="h-10 w-10" />
-          </div>
+        {/* viewfinder */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease }}
+          className="relative mt-2 aspect-[3/4] w-full overflow-hidden rounded-3xl bg-night-2 ring-1 ring-white/10"
+        >
+          <AnimatePresence mode="wait">
+            {preview ? (
+              <motion.img
+                key={preview}
+                src={preview}
+                alt="Label preview"
+                initial={{ opacity: 0, scale: 1.05 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4, ease }}
+                className="absolute inset-0 h-full w-full object-contain"
+              />
+            ) : (
+              <motion.div key="empty" exit={{ opacity: 0 }} className="absolute inset-0 grid place-items-center">
+                <div className="text-center">
+                  <Camera className="mx-auto h-10 w-10 text-white/25" />
+                  <p className="mt-3 text-sm text-white/45">Point at the ingredients &amp; nutrition table</p>
+                </div>
+                {/* scanning beam */}
+                <motion.div
+                  aria-hidden
+                  className="absolute inset-x-8 h-0.5 bg-lime shadow-[0_0_20px_6px_rgb(182_240_156/0.45)]"
+                  animate={{ top: ["12%", "88%", "12%"] }}
+                  transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* corner brackets */}
+          {(["top-5 left-5 border-t-3 border-l-3 rounded-tl-xl", "top-5 right-5 border-t-3 border-r-3 rounded-tr-xl", "bottom-5 left-5 border-b-3 border-l-3 rounded-bl-xl", "bottom-5 right-5 border-b-3 border-r-3 rounded-br-xl"] as const).map((c, i) => (
+            <motion.span
+              key={c}
+              aria-hidden
+              className={`absolute h-10 w-10 border-lime ${c}`}
+              animate={{ scale: [1, 0.9, 1] }}
+              transition={{ duration: 2, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
+            />
+          ))}
+        </motion.div>
+
+        {!preview && (
+          <motion.ul
+            initial="hidden"
+            animate="show"
+            variants={{ show: { transition: { staggerChildren: 0.1, delayChildren: 0.3 } } }}
+            className="mt-5 flex flex-wrap justify-center gap-2"
+          >
+            {TIPS.map((t) => (
+              <motion.li
+                key={t}
+                variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
+                className="rounded-full bg-white/8 px-3 py-1 text-xs text-white/60"
+              >
+                {t}
+              </motion.li>
+            ))}
+          </motion.ul>
         )}
-      </Card>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand text-sm font-medium text-white hover:bg-brand-dark">
-          <Camera className="h-4 w-4" /> Take photo
-          <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
-        </label>
-        <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-white text-sm font-medium hover:bg-muted">
-          <ImageUp className="h-4 w-4" /> Upload
-          <input type="file" accept="image/*" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
-        </label>
+        <div className="mt-auto pt-6">
+          <div className="grid grid-cols-2 gap-3">
+            <motion.label
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-lime text-sm font-semibold text-night hover:bg-white"
+            >
+              {preview ? <RotateCcw className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+              {preview ? "Retake" : "Take photo"}
+              <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+            </motion.label>
+            <motion.label
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 text-sm font-medium hover:bg-white/10"
+            >
+              <ImageUp className="h-4 w-4" /> Upload
+              <input type="file" accept="image/*" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+            </motion.label>
+          </div>
+
+          <Button variant="light" className="mt-3 h-12 w-full" disabled>
+            <Sparkles className="h-4 w-4" /> Analyse label (coming next)
+          </Button>
+        </div>
       </div>
-
-      <Button className="mt-4 w-full" disabled>
-        Analyse label (coming next)
-      </Button>
     </main>
   );
 }

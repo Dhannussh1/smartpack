@@ -4,15 +4,18 @@
   --color-brand: #0f8a5f;
   --color-brand-dark: #0b6b4a;
   --color-brand-soft: #e3f4ec;
+  --color-lime: #b6f09c;
+  --color-night: #07130e;
+  --color-night-2: #0e2119;
   --color-ink: #14201b;
   --color-ink-soft: #55635d;
   --color-ink-faint: #93a09a;
   --color-line: #dfe6e2;
   --color-muted: #f3f6f4;
-  --color-page: #f7f9f8;
+  --color-page: #f6f8f7;
   --color-good: #138a52;
   --color-warn: #b7791f;
-  --color-bad: #c53030;
+  --color-bad: #d64545;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -20,4 +23,10 @@
 body {
   background: var(--color-page);
   color: var(--color-ink);
+}
+
+/* faint dot grid used on the dark hero */
+.dot-grid {
+  background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
 }

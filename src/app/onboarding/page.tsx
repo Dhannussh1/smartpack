@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, FileUp, ShieldCheck, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft, ArrowRight, Check, FileText, FileUp, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth, type Profile } from "@/lib/useAuth";
 import {
@@ -21,11 +22,16 @@ import {
   type Activity,
   type Gender,
 } from "@/lib/health";
-import { Button, Card, Chips, Field, FullPageSpinner, Logo, cn, inputClass } from "@/components/ui";
+import { Button, Chips, Field, FullPageSpinner, Glow, Logo, cn, inputClass } from "@/components/ui";
+import { CountUp, ease } from "@/components/motion";
 
 const MAX_FILE_MB = 10;
 const ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
-const STEPS = ["About you", "Your health", "Reports"] as const;
+const STEPS = [
+  { title: "About you", sub: "We use this to calculate your daily calorie and nutrient limits." },
+  { title: "Your health", sub: "This is what makes every scan personal to you." },
+  { title: "Reports", sub: "Optional, but a recent checkup report makes verdicts far more precise." },
+] as const;
 
 export default function OnboardingPage() {
   const auth = useAuth();
@@ -56,6 +62,7 @@ function OnboardingForm({
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [dir, setDir] = useState(1); // slide direction for step transitions
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,10 +111,15 @@ function OnboardingForm({
     return null;
   }
 
+  function go(to: number) {
+    setDir(to > step ? 1 : -1);
+    setStep(to);
+  }
+
   function next() {
     const err = validateStep(step);
     setError(err);
-    if (!err) setStep(step + 1);
+    if (!err) go(step + 1);
   }
 
   async function submit(e: FormEvent) {
@@ -116,7 +128,7 @@ function OnboardingForm({
     for (let s = 0; s < STEPS.length; s++) {
       const err = validateStep(s);
       if (err) {
-        setStep(s);
+        go(s);
         setError(err);
         return;
       }
@@ -156,17 +168,19 @@ function OnboardingForm({
         processing_status: "pending",
         onboarded_at: existing ? undefined : new Date().toISOString(),
       });
-      if (pErr) throw pErr;
+      if (pErr) throw new Error(`Saving profile failed: ${pErr.message}`);
 
       if (file) {
         const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${userId}/${crypto.randomUUID().slice(0, 8)}-${safe}`;
-        const { error: uErr } = await sb.storage.from("health-docs").upload(path, file, { contentType: file.type });
-        if (uErr) throw uErr;
+        const { error: uErr } = await sb.storage
+          .from("health-docs")
+          .upload(path, file, { contentType: file.type || "application/octet-stream" });
+        if (uErr) throw new Error(`Report upload failed: ${uErr.message}`);
         const { error: dErr } = await sb
           .from("health_documents")
           .insert({ user_id: userId, file_path: path, file_name: file.name, mime_type: file.type });
-        if (dErr) throw dErr;
+        if (dErr) throw new Error(`Saving report record failed: ${dErr.message}`);
       }
 
       // Kick off AI processing (report extraction + embeddings). Fire-and-forget:
@@ -181,208 +195,295 @@ function OnboardingForm({
   }
 
   const cat = bmiVal ? bmiCategory(bmiVal) : null;
+  const typeHint = DIET_TYPES.find((t) => t.id === dietType);
 
   return (
-    <main className="mx-auto min-h-dvh max-w-xl px-5 pb-16">
-      <header className="flex items-center justify-between py-5">
-        <Logo />
-        <span className="text-sm text-ink-soft">
-          Step {step + 1} of {STEPS.length}
-        </span>
-      </header>
+    <main className="relative min-h-dvh">
+      <Glow />
+      <div className="mx-auto max-w-xl px-5 pb-20">
+        <header className="flex items-center justify-between py-5">
+          <Logo />
+          <span className="text-sm text-ink-soft tabular-nums">
+            {step + 1} / {STEPS.length}
+          </span>
+        </header>
 
-      <div className="mb-6 flex gap-2" aria-hidden>
-        {STEPS.map((s, i) => (
-          <div key={s} className={cn("h-1.5 flex-1 rounded-full", i <= step ? "bg-brand" : "bg-line")} />
-        ))}
-      </div>
-
-      <h1 className="text-2xl font-semibold tracking-tight">{STEPS[step]}</h1>
-      <p className="mt-1 text-sm text-ink-soft">
-        {step === 0 && "We use this to calculate your daily calorie and nutrient limits."}
-        {step === 1 && "This is what makes every scan personal to you."}
-        {step === 2 && "Optional, but a recent checkup report makes verdicts far more precise."}
-      </p>
-
-      <form onSubmit={submit} className="mt-6 space-y-5">
-        {step === 0 && (
-          <>
-            <Field label="Full name" required>
-              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
-            </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Date of birth" required hint={age != null ? `Age: ${age} years` : undefined}>
-                <input
-                  type="date"
-                  className={inputClass}
-                  value={dob}
-                  max={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setDob(e.target.value)}
+        {/* stepper */}
+        <ol className="mb-8 grid grid-cols-3 gap-2">
+          {STEPS.map((s, i) => (
+            <li key={s.title}>
+              <div className="h-1.5 overflow-hidden rounded-full bg-line">
+                <motion.div
+                  className="h-full rounded-full bg-brand"
+                  initial={false}
+                  animate={{ width: i <= step ? "100%" : "0%" }}
+                  transition={{ duration: 0.5, ease }}
                 />
-              </Field>
-              <Field label="Gender" required>
-                <select className={inputClass} value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other / prefer not to say</option>
-                </select>
-              </Field>
-              <Field label="Height (cm)" required>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  className={inputClass}
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  placeholder="170"
-                />
-              </Field>
-              <Field label="Weight (kg)" required>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  className={inputClass}
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  placeholder="68"
-                />
-              </Field>
-            </div>
-            <Field label="Activity level" required>
-              <select className={inputClass} value={activity} onChange={(e) => setActivity(e.target.value as Activity)}>
-                {Object.entries(ACTIVITY_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </Field>
+              </div>
+              <span className={cn("mt-2 flex items-center gap-1 text-xs", i <= step ? "font-medium text-ink" : "text-ink-faint")}>
+                {i < step && <Check className="h-3 w-3 text-brand" strokeWidth={3} />}
+                {s.title}
+              </span>
+            </li>
+          ))}
+        </ol>
 
-            {bmiVal && metrics && cat && (
-              <Card className="grid grid-cols-3 gap-3 bg-muted p-4 text-center shadow-none">
-                <Metric label="BMI" value={bmiVal.toFixed(1)} sub={cat.label} tone={cat.tone} />
-                <Metric label="BMR" value={metrics.bmr.toLocaleString()} sub="kcal at rest" />
-                <Metric label="Daily need" value={metrics.daily.toLocaleString()} sub="kcal / day" />
-              </Card>
-            )}
-          </>
-        )}
-
-        {step === 1 && (
-          <>
-            <Field label="Health conditions" hint="Select any that apply. Leave empty if none.">
-              <Chips options={CONDITIONS} value={conditions} onChange={setConditions} />
-            </Field>
-            <Field label="Allergies / intolerances">
-              <Chips options={ALLERGIES} value={allergies} onChange={setAllergies} />
-            </Field>
-            <Field label="Diet type" required hint="Pick one. We flag ingredients that don't fit your diet.">
-              <Chips options={DIET_TYPES} value={dietType ? [dietType] : []} onChange={(v) => setDietType(v.at(-1) ?? "")} />
-              {dietType && (
-                <span className="mt-2 block rounded-lg bg-brand-soft px-3 py-2 text-xs text-brand-dark">
-                  <b>{DIET_TYPES.find((t) => t.id === dietType)?.label}:</b>{" "}
-                  {DIET_TYPES.find((t) => t.id === dietType)?.hint}
-                </span>
-              )}
-            </Field>
-            <Field label="Extra diet rules" hint="Optional. Pick any that apply.">
-              <Chips options={DIET_RULES} value={dietRules} onChange={setDietRules} />
-              {dietRules.length > 0 && (
-                <span className="mt-2 block space-y-1 rounded-lg bg-muted px-3 py-2 text-xs text-ink-soft">
-                  {DIET_RULES.filter((r) => dietRules.includes(r.id)).map((r) => (
-                    <span key={r.id} className="block">
-                      <b className="text-ink">{r.label}:</b> {r.hint}
-                    </span>
-                  ))}
-                </span>
-              )}
-            </Field>
-            <Field label="Current goal" required>
-              <Chips options={GOALS} value={goals} onChange={setGoals} />
-            </Field>
-            <Field
-              label="Describe your health condition (optional)"
-              hint="E.g. “Type 2 diabetic for 3 years, on metformin. Trying to cut sugar and lose 5 kg. Get acidity with spicy food.”"
+        <form onSubmit={submit}>
+          <AnimatePresence mode="wait" custom={dir} initial={false}>
+            <motion.div
+              key={step}
+              custom={dir}
+              variants={{
+                enter: (d: number) => ({ opacity: 0, x: 40 * d }),
+                center: { opacity: 1, x: 0 },
+                exit: (d: number) => ({ opacity: 0, x: -40 * d }),
+              }}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.3, ease }}
             >
-              <textarea
-                rows={5}
-                className={cn(inputClass, "h-auto py-3 leading-relaxed")}
-                value={healthText}
-                onChange={(e) => setHealthText(e.target.value)}
-                placeholder="Tell us anything a nutritionist should know…"
-              />
-            </Field>
-          </>
-        )}
+              <h1 className="text-3xl font-semibold tracking-tight">{STEPS[step].title}</h1>
+              <p className="mt-1.5 text-sm text-ink-soft">{STEPS[step].sub}</p>
 
-        {step === 2 && (
-          <>
-            <Field label="Health checkup report" hint={`PDF or photo, up to ${MAX_FILE_MB} MB. Blood sugar, lipid profile, etc.`}>
-              {file ? (
-                <div className="flex items-center justify-between rounded-xl border border-brand bg-brand-soft px-4 py-3 text-sm">
-                  <span className="truncate font-medium text-brand-dark">{file.name}</span>
-                  <button type="button" onClick={() => setFile(null)} aria-label="Remove file" className="text-ink-soft hover:text-ink">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <span className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-line bg-white px-4 py-8 text-center text-sm text-ink-soft transition hover:border-brand">
-                  <FileUp className="h-6 w-6 text-brand" />
-                  Tap to upload a report
-                  <input
-                    type="file"
-                    accept={ACCEPT}
-                    className="sr-only"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  />
-                </span>
-              )}
-            </Field>
-            <p className="flex items-start gap-2 rounded-xl bg-muted p-4 text-xs leading-relaxed text-ink-soft">
-              <ShieldCheck className="h-4 w-4 shrink-0 text-brand" />
-              Reports are stored in a private, encrypted bucket that only your account can read. You can delete them
-              any time. SmartPack gives guidance, not medical advice.
-            </p>
-          </>
-        )}
+              <div className="mt-7 space-y-6">
+                {step === 0 && (
+                  <>
+                    <Field label="Full name" required>
+                      <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Field label="Date of birth" required hint={age != null ? `Age: ${age} years` : undefined}>
+                        <input
+                          type="date"
+                          className={inputClass}
+                          value={dob}
+                          max={new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setDob(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Gender" required>
+                        <select className={inputClass} value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other / prefer not to say</option>
+                        </select>
+                      </Field>
+                      <Field label="Height (cm)" required>
+                        <input type="number" inputMode="decimal" className={inputClass} value={height} onChange={(e) => setHeight(e.target.value)} placeholder="170" />
+                      </Field>
+                      <Field label="Weight (kg)" required>
+                        <input type="number" inputMode="decimal" className={inputClass} value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="68" />
+                      </Field>
+                    </div>
+                    <Field label="Activity level" required>
+                      <select className={inputClass} value={activity} onChange={(e) => setActivity(e.target.value as Activity)}>
+                        {Object.entries(ACTIVITY_LABELS).map(([k, v]) => (
+                          <option key={k} value={k}>
+                            {v}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
 
-        {error && <p className="rounded-lg bg-bad/10 px-3 py-2 text-sm text-bad">{error}</p>}
+                    <AnimatePresence>
+                      {bmiVal && metrics && cat && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 12 }}
+                          transition={{ duration: 0.4, ease }}
+                          className="grid grid-cols-3 overflow-hidden rounded-2xl bg-night text-center text-white"
+                        >
+                          <Metric label="BMI" sub={cat.label} tone={cat.tone}>
+                            {bmiVal.toFixed(1)}
+                          </Metric>
+                          <Metric label="BMR" sub="kcal at rest">
+                            <CountUp value={metrics.bmr} />
+                          </Metric>
+                          <Metric label="Daily need" sub="kcal / day" highlight>
+                            <CountUp value={metrics.daily} />
+                          </Metric>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
 
-        <div className="flex gap-3 pt-2">
-          {step > 0 && (
-            <Button type="button" variant="outline" onClick={() => { setError(null); setStep(step - 1); }}>
-              <ArrowLeft className="h-4 w-4" /> Back
-            </Button>
-          )}
-          {step < STEPS.length - 1 ? (
-            // distinct keys: React must not reuse the same <button> when it switches to type="submit",
-            // otherwise the click that opens the last step also submits the form
-            <Button key="continue" type="button" className="flex-1" onClick={next}>
-              Continue <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button key="submit" type="submit" className="flex-1" loading={saving}>
-              {existing ? "Save profile" : "Finish setup"}
-            </Button>
-          )}
-        </div>
-      </form>
+                {step === 1 && (
+                  <>
+                    <Field label="Health conditions" group hint="Select any that apply. Leave empty if none.">
+                      <Chips options={CONDITIONS} value={conditions} onChange={setConditions} />
+                    </Field>
+                    <Field label="Allergies / intolerances" group>
+                      <Chips options={ALLERGIES} value={allergies} onChange={setAllergies} />
+                    </Field>
+                    <Field label="Diet type" required group hint="Pick one. We flag ingredients that don't fit your diet.">
+                      <Chips options={DIET_TYPES} value={dietType ? [dietType] : []} onChange={(v) => setDietType(v.at(-1) ?? "")} />
+                      <AnimatePresence mode="wait">
+                        {typeHint && (
+                          <motion.span
+                            key={typeHint.id}
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="mt-3 block rounded-xl border border-brand/20 bg-brand-soft px-3.5 py-2.5 text-xs leading-relaxed text-brand-dark"
+                          >
+                            <b>{typeHint.label}:</b> {typeHint.hint}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </Field>
+                    <Field label="Extra diet rules" group hint="Optional. Pick any that apply.">
+                      <Chips options={DIET_RULES} value={dietRules} onChange={setDietRules} />
+                      {dietRules.length > 0 && (
+                        <span className="mt-3 block space-y-1 rounded-xl bg-muted px-3.5 py-2.5 text-xs text-ink-soft">
+                          {DIET_RULES.filter((r) => dietRules.includes(r.id)).map((r) => (
+                            <span key={r.id} className="block">
+                              <b className="text-ink">{r.label}:</b> {r.hint}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </Field>
+                    <Field label="Current goal" required group>
+                      <Chips options={GOALS} value={goals} onChange={setGoals} />
+                    </Field>
+                    <Field
+                      label="Describe your health condition (optional)"
+                      hint="E.g. “Type 2 diabetic for 3 years, on metformin. Trying to cut sugar and lose 5 kg. Get acidity with spicy food.”"
+                    >
+                      <textarea
+                        rows={4}
+                        className={cn(inputClass, "h-auto py-3 leading-relaxed")}
+                        value={healthText}
+                        onChange={(e) => setHealthText(e.target.value)}
+                        placeholder="Tell us anything a nutritionist should know…"
+                      />
+                    </Field>
+                  </>
+                )}
+
+                {step === 2 && (
+                  <>
+                    <Field label="Health checkup report" group hint={`PDF or photo, up to ${MAX_FILE_MB} MB. Blood sugar, lipid profile, thyroid, etc.`}>
+                      <AnimatePresence mode="wait" initial={false}>
+                        {file ? (
+                          <motion.div
+                            key="file"
+                            initial={{ opacity: 0, scale: 0.96 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.96 }}
+                            className="flex items-center gap-3 rounded-2xl border border-brand bg-brand-soft px-4 py-4 text-sm"
+                          >
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-white">
+                              <FileText className="h-5 w-5" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium text-brand-dark">{file.name}</span>
+                              <span className="text-xs text-brand-dark/70">{(file.size / 1024 / 1024).toFixed(2)} MB · ready to upload</span>
+                            </span>
+                            <button type="button" onClick={() => setFile(null)} aria-label="Remove file" className="rounded-lg p-1.5 text-ink-soft hover:bg-white hover:text-ink">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </motion.div>
+                        ) : (
+                          <motion.label
+                            key="drop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-line bg-white px-4 py-10 text-center transition-colors hover:border-brand hover:bg-brand-soft/40"
+                          >
+                            <motion.span
+                              className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft"
+                              animate={{ y: [0, -4, 0] }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                            >
+                              <FileUp className="h-6 w-6 text-brand" />
+                            </motion.span>
+                            <span className="text-sm font-medium text-ink">Tap to upload a report</span>
+                            <span className="text-xs text-ink-faint">PDF, JPG, PNG or WebP</span>
+                            <input type="file" accept={ACCEPT} className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                          </motion.label>
+                        )}
+                      </AnimatePresence>
+                    </Field>
+                    <p className="flex items-start gap-2.5 rounded-xl bg-muted p-4 text-xs leading-relaxed text-ink-soft">
+                      <ShieldCheck className="h-4 w-4 shrink-0 text-brand" />
+                      Reports are stored in a private bucket that only your account can read. You can delete them any time.
+                      SmartPack gives guidance, not medical advice.
+                    </p>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {error && (
+              <motion.p
+                key={error}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto", x: [0, -6, 6, -4, 4, 0] }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-6 rounded-xl bg-bad/10 px-3.5 py-2.5 text-sm text-bad"
+              >
+                {error}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          <div className="mt-8 flex gap-3">
+            {step > 0 && (
+              <Button type="button" variant="outline" className="h-12" onClick={() => { setError(null); go(step - 1); }}>
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Button>
+            )}
+            {step < STEPS.length - 1 ? (
+              // distinct keys: React must not reuse the same <button> when it switches to type="submit",
+              // otherwise the click that opens the last step also submits the form
+              <Button key="continue" type="button" className="h-12 flex-1" onClick={next}>
+                Continue <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button key="submit" type="submit" className="h-12 flex-1" loading={saving}>
+                {existing ? "Save profile" : "Finish setup"} <Check className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </form>
+      </div>
     </main>
   );
 }
 
-function Metric({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "good" | "warn" | "bad" }) {
+function Metric({
+  label,
+  sub,
+  tone,
+  highlight,
+  children,
+}: {
+  label: string;
+  sub: string;
+  tone?: "good" | "warn" | "bad";
+  highlight?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div>
-      <div className="text-xs text-ink-soft">{label}</div>
-      <div className="mt-0.5 text-lg font-semibold tabular-nums">{value}</div>
+    <div className={cn("px-3 py-4", highlight && "bg-brand")}>
+      <div className="text-[11px] tracking-wide text-white/60 uppercase">{label}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums">{children}</div>
       <div
         className={cn(
           "text-xs",
-          tone === "good" && "text-good",
-          tone === "warn" && "text-warn",
-          tone === "bad" && "text-bad",
-          !tone && "text-ink-soft",
+          tone === "good" && "text-lime",
+          tone === "warn" && "text-amber-300",
+          tone === "bad" && "text-red-300",
+          !tone && "text-white/60",
         )}
       >
         {sub}
