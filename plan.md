@@ -1,8 +1,8 @@
-# SmartPack: Build Plan & Feature Checklist
+﻿# SmartPack: Build Plan & Feature Checklist
 
 > **One line:** Point your phone at any food packet. In seconds, know what's really inside, whether it's safe *for you*, and where the label is lying.
 
-Legend: `[x]` done · `[ ]` to do · **(M)** must-have for demo · **(S)** should-have · **(N)** nice-to-have
+Legend: `[x]` done Â· `[ ]` to do Â· **(M)** must-have for demo Â· **(S)** should-have Â· **(N)** nice-to-have
 
 ---
 
@@ -12,7 +12,7 @@ SmartPack is a web app (PWA) that reads packaged-food labels from a photo and gi
 
 **What makes it different**
 - Reads the label itself, so it works for local brands with no barcode database entry.
-- **Hidden ingredient hunter**: sugar hides under 50+ names (maltodextrin, dextrose, invert syrup…).
+- **Hidden ingredient hunter**: sugar hides under 50+ names (maltodextrin, dextrose, invert syrupâ€¦).
 - **Label Lie Detector**: checks front-of-pack claims ("No added sugar", "Multigrain") against the real ingredients.
 - **Knows your body**: the same packet gets a different verdict for a diabetic, someone on a sugar cut, or a gym-goer bulking.
 - **Code does the maths, AI explains**: calories, limits and safe quantity are deterministic; the AI never invents numbers.
@@ -22,16 +22,16 @@ SmartPack is a web app (PWA) that reads packaged-food labels from a photo and gi
 ## 2. Architecture
 
 ```
-┌──────────────────────────────┐
-│  Next.js static PWA          │  GitHub Pages (https://<user>.github.io/smartpack)
-│  login · onboarding · scan   │  no secrets in the browser
-└──────────────┬───────────────┘
-               │ supabase-js (user JWT)
-┌──────────────▼──────────────────────────────────────────────┐
-│  Supabase                                                   │
-│  Auth (Google + email) · Postgres + RLS · pgvector · Storage │
-│  ai_jobs queue (dev mode)  ·  Edge Functions (prod mode) ───┼──► Gemini API
-└─────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  Next.js static PWA          â”‚  GitHub Pages (https://<user>.github.io/smartpack)
+â”‚  login Â· onboarding Â· scan   â”‚  no secrets in the browser
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+               â”‚ supabase-js (user JWT)
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  Supabase                                                   â”‚
+â”‚  Auth (Google + email) Â· Postgres + RLS Â· pgvector Â· Storage â”‚
+â”‚  ai_jobs queue (dev mode)  Â·  Edge Functions (prod mode) â”€â”€â”€â”¼â”€â”€â–º Gemini API
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ### 2.1 AI provider modes (important)
@@ -42,9 +42,9 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 |---|---|---|---|
 | `local` | Browser | Tesseract.js OCR + deterministic engine only (no LLM). Free, offline-capable. | Fallback, offline demo, engine testing |
 | `claude-dev` | Localhost | App inserts a row in `ai_jobs` (image + prompt). **Claude Code** (in the IDE, on the team's Claude subscription) reads pending jobs, analyses the image, writes JSON back. App polls and shows the result. | Development & prompt tuning without API costs |
-| `gemini` | Production | App calls Supabase Edge Function → Gemini (vision, embeddings, reasoning). Key stored as a Supabase secret. | GitHub Pages / demo day |
+| `gemini` | Production | App calls Supabase Edge Function â†’ Gemini (vision, embeddings, reasoning). Key stored as a Supabase secret. | GitHub Pages / demo day |
 
-> ⚠️ A Claude Pro subscription **cannot be called as an API** from a website. `claude-dev` is a human-in-the-loop dev workflow (each job takes ~20–60 s and needs Claude Code running). It is **not** for production or the live demo. The live demo must use `gemini` (with `local` as backup).
+> âš ï¸ A Claude Pro subscription **cannot be called as an API** from a website. `claude-dev` is a human-in-the-loop dev workflow (each job takes ~20â€“60 s and needs Claude Code running). It is **not** for production or the live demo. The live demo must use `gemini` (with `local` as backup).
 
 **Same contract in every mode:** every provider returns the same Zod-validated JSON (`LabelExtraction`, `Verdict`), so switching modes changes zero UI code.
 
@@ -52,12 +52,12 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 
 | Secret name | Used by | Calls per scan | Why separate |
 |---|---|---|---|
-| `GEMINI_KEY_VISION` | `extract-label`: photo → label JSON | 1 (heaviest: image input) | Scans never blocked by other traffic |
+| `GEMINI_KEY_VISION` | `extract-label`: photo â†’ label JSON | 1 (heaviest: image input) | Scans never blocked by other traffic |
 | `GEMINI_KEY_REASONING` | `analyse-scan` (verdict) + `process-profile` (report parsing) | 1 | Verdict quota isolated from vision |
-| `GEMINI_KEY_EMBED` | Embeddings for profile chunks, knowledge base, scan queries | 1–2 | Embeddings are frequent and cheap; isolated from the rest |
+| `GEMINI_KEY_EMBED` | Embeddings for profile chunks, knowledge base, scan queries | 1â€“2 | Embeddings are frequent and cheap; isolated from the rest |
 
-- Set with: `npx supabase secrets set GEMINI_KEY_VISION=… GEMINI_KEY_REASONING=… GEMINI_KEY_EMBED=…`
-- ⚠️ **Free-tier rate limits are per Google Cloud project, not per key.** Keys in the same project share one quota. For the limits to be independent, each key must be created in its **own** Google Cloud project (AI Studio → Get API key → Create in new project).
+- Set with: `npx supabase secrets set GEMINI_KEY_VISION=â€¦ GEMINI_KEY_REASONING=â€¦ GEMINI_KEY_EMBED=â€¦`
+- âš ï¸ **Free-tier rate limits are per Google Cloud project, not per key.** Keys in the same project share one quota. For the limits to be independent, each key must be created in its **own** Google Cloud project (AI Studio â†’ Get API key â†’ Create in new project).
 - Don't create projects only to multiply free quota (check Google's Gemini API terms). If more throughput is needed, enable billing on one project (Tier 1 limits, low cost at hackathon volume).
 - **Fallback chain in code:** if a key returns 429 (rate limit), retry once with backoff, then fall back to the `local` mode (Tesseract + engine), so the demo never shows a blank error.
 - Track per-key usage in a small `ai_usage` log table so we can see which job is near its limit.
@@ -66,14 +66,14 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 
 ## 3. End-to-end user flow
 
-1. Land on homepage → **Get started**
+1. Land on homepage â†’ **Get started**
 2. Sign up / sign in (Google or email)
-3. Onboarding (3 steps): about you → your health → reports (optional)
-4. Profile processing (background): report extraction → Health Rulebook → embeddings
+3. Onboarding (3 steps): about you â†’ your health â†’ reports (optional)
+4. Profile processing (background): report extraction â†’ Health Rulebook â†’ embeddings
 5. Home: daily limits, today's budget, recent scans, **Scan** button
-6. Scan: take/upload photo → quality check → extraction → engine → personalised verdict
+6. Scan: take/upload photo â†’ quality check â†’ extraction â†’ engine â†’ personalised verdict
 7. Result: verdict, why, safe quantity, hidden ingredients, claim check, dates, calories, alternatives, voice
-8. "I ate this" → daily budget updates → history & weekly insights
+8. "I ate this" â†’ daily budget updates â†’ history & weekly insights
 
 ---
 
@@ -88,22 +88,22 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 - [x] Row Level Security on every table; private storage buckets `health-docs`, `scan-images`
 - [x] Google OAuth (Google Cloud client + Supabase provider), email sign-in, email confirmation off for demo
 - [x] `.env.local` with public Supabase URL + key; secrets git-ignored
-- [x] GitHub Actions workflow → GitHub Pages deploy
-- [x] Public GitHub repo created, repo variables set, Pages enabled → https://dhannussh1.github.io/smartpack/
-- [x] Add production URL to Supabase **Auth → URL Configuration → Redirect URLs**
+- [x] GitHub Actions workflow â†’ GitHub Pages deploy
+- [x] Public GitHub repo created, repo variables set, Pages enabled â†’ https://dhannussh1.github.io/smartpack/
+- [x] Add production URL to Supabase **Auth â†’ URL Configuration â†’ Redirect URLs**
 - [ ] Verify Google sign-in end to end on the live site
-- [ ] Gemini API keys: **3 keys, one per job** (see §2.2), set as Supabase secrets
+- [ ] Gemini API keys: **3 keys, one per job** (see Â§2.2), set as Supabase secrets
 - [ ] PWA manifest + icons (installable on phone home screen) **(S)**
 
 ### Phase 1: Auth & onboarding **(M)**
 - [x] Landing page with value proposition
 - [x] Login page: Google button + email/password sign-in/sign-up
-- [x] OAuth callback page (PKCE) + route guards (signed out → login, no profile → onboarding)
+- [x] OAuth callback page (PKCE) + route guards (signed out â†’ login, no profile â†’ onboarding)
 - [x] Onboarding step 1: name, DOB (auto age), gender, height, weight, activity level
-- [x] Live BMI (Asian cut-offs), BMR (Mifflin–St Jeor), daily calorie need
+- [x] Live BMI (Asian cut-offs), BMR (Mifflinâ€“St Jeor), daily calorie need
 - [x] Onboarding step 2: conditions, allergies, diet type (non-veg / eggetarian / veg / vegan / Jain, with definitions), extra diet rules (halal, no beef, no onion/garlic), goals, health paragraph (optional)
-- [x] Fix: report step was skipped (Continue → Finish button reuse submitted the form)
-- [x] Onboarding step 3: optional report upload (PDF/image ≤ 10 MB) to private bucket
+- [x] Fix: report step was skipped (Continue â†’ Finish button reuse submitted the form)
+- [x] Onboarding step 3: optional report upload (PDF/image â‰¤ 10 MB) to private bucket
 - [x] Baseline **Health Rulebook** computed in code (sugar, sodium, sat-fat, carbs, protein limits from WHO/ICMR/AHA)
 - [x] Home dashboard: daily limits, BMI, conditions, goals, edit profile, sign out
 - [ ] Delete-my-data button (profile, scans, reports, embeddings) **(S)**
@@ -112,54 +112,54 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 ### Phase 2: Profile intelligence (vectors) **(M)**
 - [ ] `ai_jobs` table + RLS (dev mode queue)
 - [ ] Edge Function `process-profile`:
-  - [ ] Read uploaded report from storage → Gemini extracts lab values (HbA1c, fasting glucose, LDL, HDL, triglycerides, BP, TSH, creatinine, vitamin D…) → `health_documents.extracted_json`
-  - [ ] Refine Rulebook with lab values (e.g. HbA1c ≥ 6.5 → strict sugar; LDL > 130 → strict sat-fat)
-  - [ ] Chunk profile + health text + report summary + rulebook → Gemini embeddings → `profile_embeddings`
+  - [ ] Read uploaded report from storage â†’ Gemini extracts lab values (HbA1c, fasting glucose, LDL, HDL, triglycerides, BP, TSH, creatinine, vitamin Dâ€¦) â†’ `health_documents.extracted_json`
+  - [ ] Refine Rulebook with lab values (e.g. HbA1c â‰¥ 6.5 â†’ strict sugar; LDL > 130 â†’ strict sat-fat)
+  - [ ] Chunk profile + health text + report summary + rulebook â†’ Gemini embeddings â†’ `profile_embeddings`
   - [ ] Set `profiles.processing_status` = ready / failed
-- [ ] Home shows "Profile analysed ✓" + extracted lab values
+- [ ] Home shows "Profile analysed âœ“" + extracted lab values
 - [ ] Re-process automatically when the profile is edited
 
 ### Phase 3: Knowledge base **(M)**
 - [ ] Seed `ingredient_aliases` (target 300+ rows):
-  - [ ] Hidden sugars (50+): sucrose, dextrose, maltodextrin, glucose syrup, invert sugar, HFCS, jaggery, honey, fruit juice concentrate, maltose, corn syrup solids…
+  - [ ] Hidden sugars (50+): sucrose, dextrose, maltodextrin, glucose syrup, invert sugar, HFCS, jaggery, honey, fruit juice concentrate, maltose, corn syrup solidsâ€¦
   - [ ] Fats: palm oil / palmolein, hydrogenated / partially hydrogenated oil (trans fat), interesterified fat, vanaspati
   - [ ] Sodium sources: salt, MSG (E621), sodium benzoate (E211), baking soda, disodium inosinate/guanylate
-  - [ ] Additives (E-numbers): colours (E102 tartrazine, E110, E129…), preservatives, sweeteners (aspartame, sucralose, acesulfame-K)
-  - [ ] Allergens: milk, peanut, tree nuts, gluten/wheat, soy, egg, sesame, shellfish + Indian names (maida, atta, besan…)
+  - [ ] Additives (E-numbers): colours (E102 tartrazine, E110, E129â€¦), preservatives, sweeteners (aspartame, sucralose, acesulfame-K)
+  - [ ] Allergens: milk, peanut, tree nuts, gluten/wheat, soy, egg, sesame, shellfish + Indian names (maida, atta, besanâ€¦)
   - [ ] Diet conflicts: gelatin, egg, onion/garlic (Jain), animal rennet, E120 (carmine)
 - [ ] Seed `knowledge_chunks` with guideline snippets + embeddings: FSSAI labelling rules, ICMR-NIN dietary guidelines 2024, WHO sugar/sodium/trans-fat, ADA diabetes nutrition, AHA heart guidance
 - [ ] Python/Node seed script (`scripts/seed-knowledge.*`) using the service-role key locally (never committed)
 
 ### Phase 4: Scan pipeline **(M)**
 - [x] Scan page: take photo (rear camera) or upload, preview
-- [ ] Image pre-processing: resize to ≤ 1600 px, JPEG compress, blur/darkness check → "retake photo" prompt
+- [ ] Image pre-processing: resize to â‰¤ 1600 px, JPEG compress, blur/darkness check â†’ "retake photo" prompt
 - [ ] Multi-photo scan: front of pack + back label in one scan **(S)**
-- [ ] Upload image to `scan-images/<uid>/…`
-- [ ] **Extraction** (provider) → strict JSON `LabelExtraction`:
+- [ ] Upload image to `scan-images/<uid>/â€¦`
+- [ ] **Extraction** (provider) â†’ strict JSON `LabelExtraction`:
   - product name, brand, net weight, serving size, servings per pack
   - nutrition table per 100 g and per serving (energy, protein, carbs, total sugar, added sugar, fat, sat fat, trans fat, sodium, fibre)
   - ingredients list (ordered), allergen statement, "may contain traces"
-  - front-of-pack claims ("No added sugar", "Multigrain", "High protein", "Natural"…)
+  - front-of-pack claims ("No added sugar", "Multigrain", "High protein", "Natural"â€¦)
   - manufacture date, expiry / best-before, FSSAI licence no., veg/non-veg mark
   - confidence per field
 - [ ] Zod validation + low-confidence fallback ("We couldn't read the nutrition table, retake?")
 - [ ] **Deterministic engine** (`src/lib/engine/*`, pure TypeScript, unit-tested):
-  - [ ] Ingredient normaliser + alias matching → hidden sugars, trans fats, palm oil, MSG, E-numbers, allergens, diet conflicts
+  - [ ] Ingredient normaliser + alias matching â†’ hidden sugars, trans fats, palm oil, MSG, E-numbers, allergens, diet conflicts
   - [ ] Calories & macros per serving / per pack; % of user's daily need
   - [ ] Sugar in teaspoons (4 g = 1 tsp)
-  - [ ] Date check: expired / expires ≤ 7 days / OK / not found (chrono-node + "best before N months from mfg")
-  - [ ] **Safe quantity** = min over nutrients of (user daily limit ÷ amount per serving), capped by goal → "max 2 biscuits / day"
-  - [ ] Rule-based verdict floor (e.g. allergen match ⇒ AVOID, expired ⇒ AVOID, trans fat > 0.2 g ⇒ LIMIT)
-  - [ ] Health score 0–100
+  - [ ] Date check: expired / expires â‰¤ 7 days / OK / not found (chrono-node + "best before N months from mfg")
+  - [ ] **Safe quantity** = min over nutrients of (user daily limit Ã· amount per serving), capped by goal â†’ "max 2 biscuits / day"
+  - [ ] Rule-based verdict floor (e.g. allergen match â‡’ AVOID, expired â‡’ AVOID, trans fat > 0.2 g â‡’ LIMIT)
+  - [ ] Health score 0â€“100
 - [ ] **Label Lie Detector** (engine rules + AI wording):
   - [ ] "No added sugar" but sugar aliases present
   - [ ] "Multigrain / whole wheat" but first ingredient is maida / refined flour
   - [ ] "Low fat" but sugar high
   - [ ] "Natural" with artificial colours / flavours
   - [ ] "High protein" below FSSAI threshold (protein < 20% energy)
-  - [ ] "Sugar free" with maltitol / sweeteners → note for diabetics
+  - [ ] "Sugar free" with maltitol / sweeteners â†’ note for diabetics
   - [ ] Output: "4 claims checked, 2 misleading"
-- [ ] **Personalised reasoning (RAG)**: embed label summary → retrieve top user chunks + guideline chunks → LLM gets label JSON + engine flags + context → strict JSON `Verdict` (verdict, headline, reasons with citations, tips, alternatives). The LLM can't override an engine AVOID.
+- [ ] **Personalised reasoning (RAG)**: embed label summary â†’ retrieve top user chunks + guideline chunks â†’ LLM gets label JSON + engine flags + context â†’ strict JSON `Verdict` (verdict, headline, reasons with citations, tips, alternatives). The LLM can't override an engine AVOID.
 - [ ] Save to `scans` (label_json, engine_json, verdict_json, verdict, score)
 
 ### Phase 5: Result screen **(M)**
@@ -171,14 +171,14 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 - [ ] Nutrition per serving + % of daily limits (bars) + sugar teaspoon visual
 - [ ] Expiry status chip
 - [ ] Allergen alert banner (bold red)
-- [ ] Healthier alternatives (2–3 suggestions)
-- [ ] "I ate this" button (servings stepper) → `daily_intake`
+- [ ] Healthier alternatives (2â€“3 suggestions)
+- [ ] "I ate this" button (servings stepper) â†’ `daily_intake`
 - [ ] Disclaimer footer
 
 ### Phase 6: Engagement & impact
 - [ ] Daily budget tracker on home: "18 g of your 25 g sugar used today" **(S)**
 - [ ] Scan history list + scan detail page **(S)**
-- [ ] Voice output: Web Speech API, English / Tamil / Hindi verdict summary **(S)**
+- [ ] Voice output: Web Speech API, English + Tamil verdict summary (Hindi voice not available on our test devices, so skipped) **(S)**
 - [ ] Compare mode: two packets side by side for this user **(N)**
 - [ ] Weekly insights: top risky foods, average sugar per item (Recharts) **(N)**
 - [ ] Family profiles (parent / child) with profile switcher **(N)**
@@ -187,7 +187,7 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 
 ### Phase 7: Dev-mode bridge (`claude-dev`) **(S, dev only)**
 - [ ] `ai_jobs` table: id, user_id, kind (`extract_label` / `verdict` / `process_profile`), input_json, image_path, status (pending / running / done / failed), output_json, timestamps
-- [ ] Provider `claude-dev`: insert job → poll every 2 s (or Supabase Realtime) → resolve with output_json
+- [ ] Provider `claude-dev`: insert job â†’ poll every 2 s (or Supabase Realtime) â†’ resolve with output_json
 - [ ] `scripts/dev-jobs` helper: list pending jobs, download the image, write the result back (used by Claude Code)
 - [ ] Shared system prompts in `prompts/*.md`, the same text used by the Gemini Edge Functions, so tuning in dev carries to prod
 
@@ -203,7 +203,7 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 ### Phase 9: Demo & pitch
 - [ ] Two pre-made demo accounts: **Diabetic on sugar cut** and **Gym bulking**
 - [ ] 5 "problem packets" with misleading claims ready on the table
-- [ ] 3-minute script: hook → judge's own packet → hidden sugar reveal → profile switch flips verdict → Tamil voice → one architecture slide → impact close
+- [ ] 3-minute script: hook â†’ judge's own packet â†’ hidden sugar reveal â†’ profile switch flips verdict â†’ Tamil voice â†’ one architecture slide â†’ impact close
 - [ ] Prepared answers: hallucination (engine + RAG + schema), privacy (RLS, private buckets, delete data), accuracy (measured), scale (serverless)
 
 ---
@@ -212,13 +212,13 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 
 | # | Item | When | Notes |
 |---|---|---|---|
-| 1 | Test Google sign-in on the live site (laptop + phone) | Now | https://dhannussh1.github.io/smartpack/ |
-| 2 | Teammates' Gmail addresses added as **test users** (Google Auth Platform → Audience) | Now | Only test users can use Google sign-in while the app is in Testing mode |
-| 3 | **20 label photos** in `smartpack/test-labels/` (back of pack: ingredients + nutrition table + dates, plus front of pack) | Before the scan pipeline | Mix: biscuits, chips, juice, instant noodles, chocolate, health drink, "diet"/"sugar-free" items, 2–3 local brands. Used for dev, engine tests and the accuracy number on the pitch slide |
+| 1 | ✅ Google sign-in tested (desktop); phone test after the build | Now | https://dhannussh1.github.io/smartpack/ |
+| 2 | ✅ Teammates' Gmail addresses added as **test users** (Google Auth Platform â†’ Audience) | Now | Only test users can use Google sign-in while the app is in Testing mode |
+| 3 | **20 label photos** in `smartpack/test-labels/` (back of pack: ingredients + nutrition table + dates, plus front of pack) | Before the scan pipeline | Mix: biscuits, chips, juice, instant noodles, chocolate, health drink, "diet"/"sugar-free" items, 2â€“3 local brands. Used for dev, engine tests and the accuracy number on the pitch slide |
 | 4 | 5 "problem packets" with misleading claims ("No added sugar", "Multigrain", "Natural") | Before demo | Physical packets for the stage |
-| 5 | 3 Gemini API keys set as Supabase secrets (§2.2) | Before the Gemini phase | Run the `secrets set` command yourself; never paste keys in chat |
+| 5 | 3 Gemini API keys set as Supabase secrets (Â§2.2) | Before the Gemini phase | Run the `secrets set` command yourself; never paste keys in chat |
 | 6 | Pick 2 demo personas (e.g. diabetic on sugar cut, gym bulking) | Before demo | Create the two accounts |
-| 7 | Phone check: camera opens, Tamil/Hindi voice available | After the result screen | Android Chrome + iPhone Safari if possible |
+| 7 | Phone check: camera opens, Tamil + English voice available (confirmed on desktop) | After the result screen | Android Chrome + iPhone Safari if possible |
 | 8 | Record the backup demo video | Last day | In case the venue Wi-Fi fails |
 
 ---
@@ -231,9 +231,9 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 | `health_documents` | Uploaded reports + extracted lab values |
 | `profile_embeddings` | Per-user vector chunks (768-dim) |
 | `knowledge_chunks` | Shared guideline vectors (FSSAI, ICMR, WHO, ADA, AHA) |
-| `ingredient_aliases` | Alias → canonical ingredient, category, risk, explanation |
+| `ingredient_aliases` | Alias â†’ canonical ingredient, category, risk, explanation |
 | `scans` | Label JSON, engine flags, verdict per scan |
-| `daily_intake` | What the user actually ate → daily budget |
+| `daily_intake` | What the user actually ate â†’ daily budget |
 | `ai_jobs` *(to add)* | Dev-mode queue for Claude Code |
 
 ---
@@ -242,7 +242,7 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 
 | Layer | Choice |
 |---|---|
-| Frontend | Next.js 16 (static export) · React 19 · Tailwind 4 · lucide-react · Recharts |
+| Frontend | Next.js 16 (static export) Â· React 19 Â· Tailwind 4 Â· lucide-react Â· Recharts |
 | Hosting | GitHub Pages via GitHub Actions |
 | Auth | Supabase Auth (Google OAuth + email) |
 | Database | Supabase Postgres + RLS |
@@ -261,24 +261,24 @@ The app talks to **one AI interface** (`analyseLabel`, `processProfile`). Behind
 ## 7. Security & privacy
 - No secret keys in the frontend: the Gemini key lives in Supabase secrets; only the public (publishable) key ships to the browser.
 - RLS: every user can read/write only their own rows; reference tables are read-only.
-- Storage paths are `<user_id>/…` and policies enforce it.
+- Storage paths are `<user_id>/â€¦` and policies enforce it.
 - Health reports in a private bucket; delete-my-data planned.
 - Clear "guidance, not medical advice" messaging.
 
 ---
 
 ## 8. Build order (priority)
-1. ~~Setup, auth, onboarding~~ ✅
-2. ~~Deploy to GitHub Pages~~ ✅ (verify Google login in production)
+1. ~~Setup, auth, onboarding~~ âœ…
+2. ~~Deploy to GitHub Pages~~ âœ… (verify Google login in production)
 3. Ingredient alias seed + deterministic engine (works with no AI at all)
 4. `claude-dev` bridge for extraction while building the UI
 5. Result screen
-6. Gemini Edge Functions (extract → verdict) + knowledge base RAG
+6. Gemini Edge Functions (extract â†’ verdict) + knowledge base RAG
 7. Profile processing (report extraction + embeddings)
 8. Daily budget, history, voice
 9. Accuracy test, demo accounts, backup video, pitch
 
-**Cut first if time is short:** family profiles → doctor PDF → offline mode → compare mode → weekly insights.
+**Cut first if time is short:** family profiles â†’ doctor PDF â†’ offline mode â†’ compare mode â†’ weekly insights.
 
 ---
 
@@ -292,3 +292,4 @@ npm run dev                  # http://localhost:3000
 ```
 
 Database changes: add a file under `supabase/migrations/`, then `npx supabase db push --remote`.
+

@@ -47,3 +47,9 @@ supabase/.branches/
 
 # google oauth secrets
 client_secret*.json
+
+# label photos stay local (public repo)
+test-labels/*
+!test-labels/README.md
+problem-packets/*
+!problem-packets/README.md
