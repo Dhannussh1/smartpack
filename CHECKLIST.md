@@ -27,7 +27,7 @@ Legend: `[x]` done · `[ ]` to do · 🔴 must before demo · 🟠 should · �
 - [x] Report upload to private bucket 🤖
 - [x] Baseline Health Rulebook (sugar, sodium, sat-fat, carbs, protein limits) 🤖
 - [x] Home dashboard: limits with WATCH badges, profile tags, recent scans 🤖
-- [ ] 🔴 **Report processing**: Gemini extracts lab values (HbA1c, glucose, LDL, BP, TSH…) → tighter rulebook → shown on home 🤖
+- [x] 🔴 **Report processing**: Gemini extracts lab values (HbA1c, glucose, LDL, BP, TSH…) → tighter rulebook → shown on home 🤖
 - [ ] 🟠 Delete-my-data button (profile, scans, reports, embeddings) 🤖
 - [ ] 🟠 "Guidance, not medical advice" consent checkbox in onboarding 🤖
 
@@ -44,16 +44,21 @@ Legend: `[x]` done · `[ ]` to do · 🔴 must before demo · 🟠 should · �
 ### 1.4 Result & engagement
 - [x] Result screen: verdict card, safe amount, sugar teaspoons, why-for-you, lie detector, highlighted ingredients, expiry, better choices 🤖
 - [x] Voice: English + Tamil 🤖
+- [x] Live camera capture (getUserMedia) + upload fallback 🤖
+- [x] Menu: Home, Scan, Health profile, My documents, Contact, Sign out 🤖
+- [x] My documents: upload new, view old (2-min private link), re-analyse, delete (vectors removed too) 🤖
+- [x] Ask about this product: answers from profile + report vectors, EN/Tamil voice 🤖
+- [x] Contact form (feedback table) 🤖
 - [ ] 🔴 **"I ate this" → daily budget** ("18 g of 25 g sugar used today") on home 🤖
 - [ ] 🟠 Scan history detail (tap a past scan to reopen the full result) 🤖
 - [ ] 🟠 Compare mode (two packets side by side) 🤖
 - [ ] 🟡 Weekly insights chart 🤖
 - [ ] 🟡 Family profiles 🤖
 
-### 1.5 Intelligence (RAG)
-- [ ] 🟠 Profile embeddings → `profile_embeddings` (key: EMBED) 🤖
+### 1.5 Intelligence (RAG): pgvector HNSW (FAISS-style ANN inside Supabase)
+- [x] 🟠 Profile embeddings → `profile_embeddings` (key: EMBED) 🤖
 - [ ] 🟠 Guideline knowledge base (FSSAI, ICMR-NIN, WHO, ADA, AHA) → `knowledge_chunks` 🤖
-- [ ] 🟠 Verdict retrieves top user + guideline chunks and cites sources 🤖
+- [x] 🟠 Verdict retrieves top user + guideline chunks and cites sources 🤖
 
 ---
 
@@ -127,6 +132,9 @@ Legend: `[x]` done · `[ ]` to do · 🔴 must before demo · 🟠 should · �
 | 26 Nov | Full UI redesign with Motion (animated hero demo, sliding onboarding, count-ups, viewfinder) | User request |
 | 26 Nov | Skipped `claude-dev` bridge; went straight to Gemini | Keys available; deadline |
 | 26 Nov | Model `gemini-2.5-flash` → `gemini-flash-latest` with low thinking (104 s → 11 s) | 2.5 closed to new users; speed |
+| 26 Nov | Light high-contrast app shell; fixed invisible header (stale dev-server CSS) | User feedback |
+| 26 Nov | Embeddings: pgvector HNSW instead of FAISS (same ANN search, no extra server) | Serverless stack |
+| 26 Nov | EMBED key returns 403 on embeddings; failover uses the other keys | Check that key's project |
 | 26 Nov | 3 Gemini keys with failover across 3 models × 3 keys on 503/429 | Gemini overload during testing |
 
 ### Pending housekeeping
