@@ -27,7 +27,25 @@ export default function DocumentsPage() {
   return <AppShell requireProfile={false}>{({ session }) => <Documents userId={session.user.id} />}</AppShell>;
 }
 
-/** Runs AI extraction + vector indexing for one document; returns an error message or null. */
+/** Photos are shrunk to ≤1600 px JPEG before upload (faster upload + faster AI read). PDFs are sent as-is. */
+async function shrinkIfImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 1.5 * 1024 * 1024) return file;
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.85));
+    return blob ? new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+  } catch {
+    return file;
+  }
+}
+
+/** Starts AI extraction + vector indexing in the background; returns an error message or null. */
 async function processDoc(id: string): Promise<string | null> {
   const { error } = await supabase().functions.invoke("process-document", { body: { document_id: id } });
   if (!error) return null;
@@ -38,7 +56,6 @@ async function processDoc(id: string): Promise<string | null> {
 
 function Documents({ userId }: { userId: string }) {
   const [docs, setDocs] = useState<Doc[] | null>(null);
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
 
@@ -46,6 +63,14 @@ function Documents({ userId }: { userId: string }) {
     const { data } = await supabase().from("health_documents").select("*").eq("user_id", userId).order("created_at", { ascending: false });
     setDocs((data as Doc[]) ?? []);
   }, [userId]);
+
+  // while any document is being analysed, refresh every 2.5 s
+  const analysing = docs?.some((d) => d.status === "processing") ?? false;
+  useEffect(() => {
+    if (!analysing) return;
+    const t = setInterval(load, 2500);
+    return () => clearInterval(t);
+  }, [analysing, load]);
 
   useEffect(() => {
     let live = true;
@@ -58,11 +83,15 @@ function Documents({ userId }: { userId: string }) {
     return () => { live = false; };
   }, [userId]);
 
-  async function upload(file: File | undefined) {
-    if (!file) return;
-    if (file.size > MAX_MB * 1024 * 1024) return setMsg({ tone: "bad", text: `File must be under ${MAX_MB} MB.` });
+  async function upload(original: File | undefined) {
+    if (!original) return;
     setMsg(null);
     setUploading(true);
+    const file = await shrinkIfImage(original);
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setUploading(false);
+      return setMsg({ tone: "bad", text: `File must be under ${MAX_MB} MB.` });
+    }
     const sb = supabase();
     try {
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -78,10 +107,8 @@ function Documents({ userId }: { userId: string }) {
       if (dErr) throw new Error(`Saving record failed: ${dErr.message}`);
       await load();
       setUploading(false);
-      setBusy((b) => ({ ...b, [row.id]: true }));
-      const err = await processDoc(row.id);
-      setBusy((b) => ({ ...b, [row.id]: false }));
-      setMsg(err ? { tone: "bad", text: `Uploaded, but analysis failed: ${err}` } : { tone: "ok", text: "Report analysed and added to your health memory." });
+      const err = await processDoc(row.id); // returns in ~1 s; analysis continues in the background
+      setMsg(err ? { tone: "bad", text: `Uploaded, but analysis couldn't start: ${err}` } : { tone: "ok", text: "Uploaded. Analysing in the background; this card updates by itself." });
       await load();
     } catch (e) {
       setMsg({ tone: "bad", text: e instanceof Error ? e.message : "Upload failed" });
@@ -96,11 +123,9 @@ function Documents({ userId }: { userId: string }) {
   }
 
   async function reprocess(d: Doc) {
-    setBusy((b) => ({ ...b, [d.id]: true }));
     setDocs((list) => list?.map((x) => (x.id === d.id ? { ...x, status: "processing" } : x)) ?? null);
     const err = await processDoc(d.id);
-    setBusy((b) => ({ ...b, [d.id]: false }));
-    setMsg(err ? { tone: "bad", text: err } : { tone: "ok", text: "Re-analysed." });
+    if (err) setMsg({ tone: "bad", text: err });
     await load();
   }
 
@@ -164,7 +189,7 @@ function Documents({ userId }: { userId: string }) {
         )}
         <AnimatePresence initial={false}>
           {docs?.map((d) => {
-            const working = busy[d.id] || d.status === "processing";
+            const working = d.status === "processing";
             const labs = Object.entries(d.extracted_json?.lab_values ?? {});
             return (
               <motion.article
@@ -191,7 +216,7 @@ function Documents({ userId }: { userId: string }) {
 
                 {working && (
                   <p className="mt-3 flex items-center gap-2 text-sm text-ink-soft">
-                    <Sparkles className="h-4 w-4 animate-pulse text-brand" /> Reading lab values and building your health memory (about 30 s)…
+                    <Sparkles className="h-4 w-4 animate-pulse text-brand" /> Reading lab values and building your health memory (usually under 15 s)…
                   </p>
                 )}
                 {!working && d.status === "failed" && <p className="mt-3 rounded-lg bg-bad/10 px-3 py-2 text-sm text-bad">{d.error ?? "Analysis failed"}</p>}

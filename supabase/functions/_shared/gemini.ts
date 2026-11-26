@@ -34,12 +34,33 @@ const KEY_ORDER: Record<Job, string[]> = {
 const keysFor = (job: Job) => KEY_ORDER[job].map((k) => Deno.env.get(k)).filter((k): k is string => !!k);
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const GEN_MODELS = [Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest", "gemini-3-flash-preview", "gemini-flash-lite-latest"];
 const EMBED_MODEL = "gemini-embedding-001";
 export const EMBED_DIMS = 768;
 
+// Benchmarked on a lab report (26 Nov): flash-lite + minimal thinking 8 s, 3-flash + minimal 10 s (both 9/9 values
+// correct); flash-latest was overloaded (503) / 28 s+. Order = fastest reliable first; flash-latest is the last resort.
+type ModelCfg = { model: string; thinking: Record<string, unknown> };
+const TIERS: Record<"fast" | "accurate", ModelCfg[]> = {
+  fast: [
+    { model: "gemini-flash-lite-latest", thinking: { thinkingLevel: "minimal" } },
+    { model: "gemini-3-flash-preview", thinking: { thinkingLevel: "minimal" } },
+    { model: "gemini-flash-latest", thinking: { thinkingLevel: "low" } },
+  ],
+  accurate: [
+    { model: "gemini-3-flash-preview", thinking: { thinkingLevel: "minimal" } },
+    { model: "gemini-flash-lite-latest", thinking: { thinkingLevel: "minimal" } },
+    { model: "gemini-flash-latest", thinking: { thinkingLevel: "low" } },
+  ],
+};
+
 /** Calls the first model/key that works. Retries on 503 (overloaded), 429 (rate limit) and 403 (key lacks access). */
-async function callWithFailover(job: Job, models: string[], method: string, body: string): Promise<unknown> {
+async function callWithFailover(
+  job: Job,
+  models: string[],
+  method: string,
+  body: string | ((model: string) => string),
+  timeoutMs = 40_000,
+): Promise<unknown> {
   let last = "";
   for (const model of models) {
     for (const key of keysFor(job)) {
@@ -48,8 +69,8 @@ async function callWithFailover(job: Job, models: string[], method: string, body
         res = await fetch(`${BASE}/${model}:${method}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body,
-          signal: AbortSignal.timeout(40_000), // a stuck call must not eat the function's time budget
+          body: typeof body === "function" ? body(model) : body,
+          signal: AbortSignal.timeout(timeoutMs), // a stuck call must not eat the function's time budget
         });
       } catch {
         last = `Gemini timeout (${model})`;
@@ -64,17 +85,25 @@ async function callWithFailover(job: Job, models: string[], method: string, body
 }
 
 /** JSON-mode generation. `parts` may include inline_data (images / PDFs). */
-export async function generateJson<T>(job: Job, system: string, parts: unknown[], opts: { fast?: boolean } = {}): Promise<T> {
-  const models = opts.fast ? ["gemini-flash-lite-latest", ...GEN_MODELS] : GEN_MODELS;
+export async function generateJson<T>(
+  job: Job,
+  system: string,
+  parts: unknown[],
+  opts: { fast?: boolean; timeoutMs?: number } = {},
+): Promise<T> {
+  const tier = TIERS[opts.fast ? "fast" : "accurate"];
+  const thinkingFor = (model: string) => tier.find((c) => c.model === model)!.thinking;
   const out = (await callWithFailover(
     job,
-    models,
+    tier.map((c) => c.model),
     "generateContent",
-    JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2, thinkingConfig: { thinkingLevel: "low" } },
-    }),
+    (model) =>
+      JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.2, thinkingConfig: thinkingFor(model) },
+      }),
+    opts.timeoutMs ?? 40_000,
   )) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   const text = out.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
   return JSON.parse(text.replace(/^```json\s*|```$/g, "")) as T;
